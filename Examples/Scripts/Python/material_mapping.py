@@ -36,6 +36,7 @@ def runMaterialMapping(
     mapName="material-map",
     mapSurface=True,
     mapVolume=True,
+    format=JsonFormat.Json,
     s=None,
 ):
     s = s or Sequencer(numThreads=1)
@@ -99,7 +100,7 @@ def runMaterialMapping(
         level=acts.logging.VERBOSE,
         converterCfg=jmConverterCfg,
         fileName=os.path.join(outputDir, mapName),
-        writeFormat=JsonFormat.Json,
+        writeFormat=format,
     )
 
     s.addWriter(
