@@ -48,7 +48,7 @@ def runMaterialMappingVariance(binMap, events, id, workDir):
     matDeco = acts.IMaterialDecorator.fromFile("geometry-map.json")
     detectorTemp, trackingGeometryTemp, decoratorsTemp = getOpenDataDetector(matDeco)
     matMapDeco = acts.MappingMaterialDecorator(
-        tGeometry=trackingGeometryTemp, level=acts.logging.INFO
+        tGeometry=trackingGeometryTemp, level=acts.logging.ERROR
     )
     # Update the binning using the bin map corresponding to this trial
     matMapDeco.setBinningMap(binMap)
@@ -78,7 +78,7 @@ def runMaterialMappingVariance(binMap, events, id, workDir):
     del sMap  # Need to be deleted to write the material map to cbor
 
     # Compute the variance by rerunning the mapping
-
+    print("Trial " + str(id) + ": second pass to compute the variance")
     # Use the material map from the previous mapping as an input
     cborMap = os.path.join(pathExp, (mapName + ".cbor"))
     matDecoVar = acts.IMaterialDecorator.fromFile(cborMap)
@@ -87,14 +87,14 @@ def runMaterialMappingVariance(binMap, events, id, workDir):
     s = acts.examples.Sequencer(events=events, numThreads=1, logLevel=acts.logging.INFO)
     for decorator in decoratorsVar:
         s.addContextDecorator(decorator)
-    wb = WhiteBoard(acts.logging.INFO)
+    wb = WhiteBoard(acts.logging.ERROR)
     context = AlgorithmContext(0, 0, wb)
     for decorator in decoratorsVar:
         assert decorator.decorate(context) == ProcessCode.SUCCESS
 
     # Read material step information from a ROOT TTRee
     reader = RootMaterialTrackReader(
-        level=acts.logging.INFO,
+        level=acts.logging.ERROR,
         collection="material-tracks",
         fileList=[os.path.join(workDir, "geant4_material_tracks.root")],
     )
@@ -117,7 +117,7 @@ def runMaterialMappingVariance(binMap, events, id, workDir):
             computeVariance=True
         )  # Don't forget to turn the `computeVariance` to true
         mapper = SurfaceMaterialMapper(
-            config=surfaceCfg, level=acts.logging.INFO, propagator=propagator
+            config=surfaceCfg, level=acts.logging.ERROR, propagator=propagator
         )
         mmAlgCfg.materialSurfaceMapper = mapper
 
@@ -127,7 +127,7 @@ def runMaterialMappingVariance(binMap, events, id, workDir):
         )
         propagator = Propagator(stepper, navigator)
         mapper = VolumeMaterialMapper(
-            level=acts.logging.INFO, propagator=propagator, mappingStep=999
+            level=acts.logging.ERROR, propagator=propagator, mappingStep=999
         )
         mmAlgCfg.materialVolumeMapper = mapper
 
@@ -140,7 +140,7 @@ def runMaterialMappingVariance(binMap, events, id, workDir):
         context=context.geoContext,
     )
 
-    mapping = MaterialMapping(level=acts.logging.INFO, config=mmAlgCfg)
+    mapping = MaterialMapping(level=acts.logging.ERROR, config=mmAlgCfg)
     s.addAlgorithm(mapping)
     s.run()
 
@@ -162,10 +162,11 @@ def runTrials(binDict, experiments, nbTrials, nbEvents, workDir):
 
     trials = dict()
     binMap = dict()
-
+    print("Prepare to run " + str(nbTrials) + " trials")
     for trial in range(nbTrials):
         # Get some suggested binning from the database
         # Orion use the database to prevent the same trials being run multiple times
+        print("Looking for binning suggestion for trial " + str(trial))
         for key in binDict:
             trials[key] = experiments[key].suggest()
             binMap[key] = (trials[key].params["x"], trials[key].params["y"])
@@ -173,7 +174,9 @@ def runTrials(binDict, experiments, nbTrials, nbEvents, workDir):
         # Once the binning of each surfaces has been chosen run the material mapping once with the configuration
         # Return the scoring parameters for each bin of the surface (variance, nb track)
         refID = trials[next(iter(binDict))].id  # ID of the trial for the first surface
+        print("Trial " + str(refID) + ": Starting the material mapping")
         results = runMaterialMappingVariance(binMap, nbEvents, refID, workDir)
+        print("Trial " + str(refID) + ": Material mapping over, now computing a score")
         # Compute a score based on the scoring parameters of each bin (variance, nb track)
         for key in binDict:
             objective = 0
@@ -189,6 +192,7 @@ def runTrials(binDict, experiments, nbTrials, nbEvents, workDir):
 
 if "__main__" == __name__:
 
+    print("Starting")
     # Optimiser arguents
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -203,15 +207,24 @@ if "__main__" == __name__:
     parser.add_argument(
         "--workDir", nargs="?", default=os.getcwd(), type=str
     )  # path to the work directory
+    parser.add_argument(
+        "--dbPath", nargs="?", default="", type=str
+    )  # path to the work directory
 
     args = parser.parse_args()
 
     pathExp = os.path.join(args.workDir, "Mapping")
-    pathDB = os.path.join(pathExp, "Database")
+    pathStoreDB = os.path.join(pathExp, "Database")
+    if args.dbPath == "":
+        pathDB = pathStoreDB
+    else:
+        pathDB = args.dbPath
     pathResult = os.path.join(pathExp, "Result")
 
     if not os.path.isdir(pathExp):
         os.makedirs(pathExp)
+    if not os.path.isdir(pathStoreDB):
+        os.makedirs(pathStoreDB)
     if not os.path.isdir(pathDB):
         os.makedirs(pathDB)
     if not os.path.isdir(pathResult):
@@ -223,7 +236,7 @@ if "__main__" == __name__:
 
     # Use the MappingMaterialDecorator to create a binning map that can be optimised
     matMapDeco = acts.MappingMaterialDecorator(
-        tGeometry=trackingGeometry, level=acts.logging.INFO
+        tGeometry=trackingGeometry, level=acts.logging.WARNING
     )
     binDict = matMapDeco.binningMap()
 
@@ -234,6 +247,7 @@ if "__main__" == __name__:
         "database": {
             "type": "pickleddb",
             "host": os.path.join(pathDB, "database.pkl"),
+            "timeout": 2400,
         },
     }
     space = {"x": "uniform(1, 10, discrete=True)", "y": "uniform(1, 10, discrete=True)"}
@@ -247,12 +261,16 @@ if "__main__" == __name__:
             version="1",
             space=space,
             storage=storage,
+            max_idle_time=2400,
         )
 
     from multiprocessing import Process
+    import time
+    import shutil
 
     # Launch `numberOfJobs` optimisation jobs in parallele
     OptiJob = []
+    print("Launch " + str(args.numberOfJobs) + " parallel jobs")
     for job in range(args.numberOfJobs):
         OptiJob.append(
             Process(
@@ -267,12 +285,17 @@ if "__main__" == __name__:
             )
         )
         OptiJob[job].start()
+        time.sleep(120)
 
     # Stop the program from going forward until all jobs are finished
     for job in range(args.numberOfJobs):
         OptiJob[job].join()
+        print("Job number " + str(job) + " is over")
 
+    print("All the jobs are over. Now creating the optimisation plots")
     # Create some performances plots for each surface
+    resultBinMap = dict()
+
     for key in binDict:
 
         pathExpSurface = os.path.join(pathResult, "b_" + str(key))
@@ -295,3 +318,43 @@ if "__main__" == __name__:
         df = experiments[key].to_pandas()
         best = df.iloc[df.objective.idxmin()]
         print(best)
+        resultBinMap[key] = (best.x, best.y)
+
+    if os.path.join(pathDB, "database.pkl") != os.path.join(
+        pathStoreDB, "database.pkl"
+    ):
+        shutil.copyfile(
+            os.path.join(pathDB, "database.pkl"),
+            os.path.join(pathStoreDB, "database.pkl"),
+        )
+
+    # The optimal binning has been found.
+    # Run the material mapping one last to obtain a usable material map
+    print("Running the material mapping to obtain the optimised material map")
+    matMapDeco.setBinningMap(resultBinMap)
+
+    # Decorate the detector with the MappingMaterialDecorator
+    resultDetector, resultTrackingGeometry, resultDecorators = getOpenDataDetector(
+        matMapDeco
+    )
+
+    # Sequence for the mapping, only use one thread when mapping material
+    rMap = acts.examples.Sequencer(
+        events=args.topNumberOfEvents, numThreads=1, logLevel=acts.logging.INFO
+    )
+
+    # Run the material mapping
+    from material_mapping import runMaterialMapping
+
+    runMaterialMapping(
+        resultTrackingGeometry,
+        resultDecorators,
+        outputDir=args.workDir,
+        inputDir=args.workDir,
+        mapName="optimised-material-map",
+        format=JsonFormat.Cbor,
+        s=rMap,
+    )
+
+    rMap.run()
+    del rMap  # Need to be deleted to write the material map to cbor
