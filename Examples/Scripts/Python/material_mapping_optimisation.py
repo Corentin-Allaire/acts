@@ -250,7 +250,10 @@ if "__main__" == __name__:
             "timeout": 2400,
         },
     }
-    space = {"x": "uniform(1, 10, discrete=True)", "y": "uniform(1, 10, discrete=True)"}
+    space = {
+        "x": "uniform(1, 120, discrete=True)",
+        "y": "uniform(1, 120, discrete=True)",
+    }
 
     # Build one experiment per surface
     # The binning of the surfaces are independent so we split
