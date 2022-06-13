@@ -78,7 +78,7 @@ def runMaterialMappingVariance(binMap, events, id, workDir):
     del sMap  # Need to be deleted to write the material map to cbor
 
     # Compute the variance by rerunning the mapping
-    print("Trial " + str(id) + ": second pass to compute the variance")
+    print("Trial " + str(id) + ": second pass to compute the variance", flush=True)
     # Use the material map from the previous mapping as an input
     cborMap = os.path.join(pathExp, (mapName + ".cbor"))
     matDecoVar = acts.IMaterialDecorator.fromFile(cborMap)
@@ -163,11 +163,11 @@ def runTrials(binDict, experiments, nbTrials, nbEvents, workDir):
     trials = dict()
     binMap = dict()
     score = dict()
-    print("Prepare to run " + str(nbTrials) + " trials")
+    print("Prepare to run " + str(nbTrials) + " trials", flush=True)
     for trial in range(nbTrials):
         # Get some suggested binning from the database
         # Orion use the database to prevent the same trials being run multiple times
-        print("Looking for binning suggestion for trial " + str(trial))
+        print("Looking for binning suggestion for trial " + str(trial), flush=True)
         for key in binDict:
             trials[key] = experiments[key].suggest()
             binMap[key] = (trials[key].params["x"], trials[key].params["y"])
@@ -175,9 +175,12 @@ def runTrials(binDict, experiments, nbTrials, nbEvents, workDir):
         # Once the binning of each surfaces has been chosen run the material mapping once with the configuration
         # Return the scoring parameters for each bin of the surface (variance, nb track)
         refID = trials[next(iter(binDict))].id  # ID of the trial for the first surface
-        print("Trial " + str(refID) + ": Starting the material mapping")
+        print("Trial " + str(refID) + ": Starting the material mapping", flush=True)
         results = runMaterialMappingVariance(binMap, nbEvents, refID, workDir)
-        print("Trial " + str(refID) + ": Material mapping over, now computing a score")
+        print(
+            "Trial " + str(refID) + ": Material mapping over, now computing a score",
+            flush=True,
+        )
         # Compute a score based on the scoring parameters of each bin (variance, nb track)
         for key in binDict:
             objective = 0
