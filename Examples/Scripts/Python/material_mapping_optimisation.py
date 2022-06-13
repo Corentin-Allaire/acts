@@ -162,6 +162,7 @@ def runTrials(binDict, experiments, nbTrials, nbEvents, workDir):
 
     trials = dict()
     binMap = dict()
+    score = dict()
     print("Prepare to run " + str(nbTrials) + " trials")
     for trial in range(nbTrials):
         # Get some suggested binning from the database
@@ -186,8 +187,11 @@ def runTrials(binDict, experiments, nbTrials, nbEvents, workDir):
                     objective += parameters[0] / math.sqrt(
                         parameters[1]
                     )  # Formula for the objective (variance/sqrt(nbTrack))
-            scores = [dict(name="surface_score", type="objective", value=objective)]
-            experiments[key].observe(trials[key], scores)
+            score[key] = [dict(name="surface_score", type="objective", value=objective)]
+
+        # Save the experiements
+        for key in binDict:
+            experiments[key].observe(trials[key], score[key])
 
 
 if "__main__" == __name__:
@@ -247,7 +251,7 @@ if "__main__" == __name__:
         "database": {
             "type": "pickleddb",
             "host": os.path.join(pathDB, "database.pkl"),
-            "timeout": 2400,
+            "timeout": 240,
         },
     }
     space = {
@@ -264,7 +268,7 @@ if "__main__" == __name__:
             version="1",
             space=space,
             storage=storage,
-            max_idle_time=2400,
+            max_idle_time=240,
         )
 
     from multiprocessing import Process
