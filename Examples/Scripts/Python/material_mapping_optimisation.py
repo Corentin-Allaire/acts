@@ -167,8 +167,8 @@ def runTrials(binDict, experiments, nbTrials, nbEvents, workDir, lock):
     for trial in range(nbTrials):
         # Get some suggested binning from the database
         # Orion use the database to prevent the same trials being run multiple times
-        print("Looking for binning suggestion for trial " + str(trial), flush=True)
         lock.acquire()
+        print("Looking for binning suggestion for trial " + str(trial), flush=True)
         for key in binDict:
             trials[key] = experiments[key].suggest()
             binMap[key] = (trials[key].params["x"], trials[key].params["y"])
@@ -194,8 +194,8 @@ def runTrials(binDict, experiments, nbTrials, nbEvents, workDir, lock):
             score[key] = [dict(name="surface_score", type="objective", value=objective)]
 
         # Save the experiements
-        print("Saving the experiment result for each surface")
         lock.acquire()
+        print("Saving the experiment result for each surface", flush=True)
         for key in binDict:
             experiments[key].observe(trials[key], score[key])
         lock.release()
@@ -278,7 +278,7 @@ if "__main__" == __name__:
             max_idle_time=240,
         )
 
-    from multiprocessing import Process
+    from multiprocessing import Process, Lock
     import time
     import shutil
 
@@ -301,7 +301,7 @@ if "__main__" == __name__:
             )
         )
         OptiJob[job].start()
-        time.sleep(120)
+        time.sleep(600)
 
     # Stop the program from going forward until all jobs are finished
     for job in range(args.numberOfJobs):
