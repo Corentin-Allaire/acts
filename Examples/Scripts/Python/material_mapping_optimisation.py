@@ -158,7 +158,7 @@ def runMaterialMappingVariance(binMap, events, id, workDir):
 
 
 # Run `nbTrials` trials for all surfaces one after another
-def runTrials(binDict, experiments, nbTrials, nbEvents, workDir):
+def runTrials(binDict, experiments, nbTrials, nbEvents, workDir, lock):
 
     trials = dict()
     binMap = dict()
@@ -168,10 +168,11 @@ def runTrials(binDict, experiments, nbTrials, nbEvents, workDir):
         # Get some suggested binning from the database
         # Orion use the database to prevent the same trials being run multiple times
         print("Looking for binning suggestion for trial " + str(trial), flush=True)
+        lock.acquire()
         for key in binDict:
             trials[key] = experiments[key].suggest()
             binMap[key] = (trials[key].params["x"], trials[key].params["y"])
-
+        lock.release()
         # Once the binning of each surfaces has been chosen run the material mapping once with the configuration
         # Return the scoring parameters for each bin of the surface (variance, nb track)
         refID = trials[next(iter(binDict))].id  # ID of the trial for the first surface
@@ -193,8 +194,11 @@ def runTrials(binDict, experiments, nbTrials, nbEvents, workDir):
             score[key] = [dict(name="surface_score", type="objective", value=objective)]
 
         # Save the experiements
+        print("Saving the experiment result for each surface")
+        lock.acquire()
         for key in binDict:
             experiments[key].observe(trials[key], score[key])
+        lock.release()
 
 
 if "__main__" == __name__:
@@ -280,6 +284,7 @@ if "__main__" == __name__:
 
     # Launch `numberOfJobs` optimisation jobs in parallele
     OptiJob = []
+    lock = Lock()
     print("Launch " + str(args.numberOfJobs) + " parallel jobs")
     for job in range(args.numberOfJobs):
         OptiJob.append(
@@ -291,6 +296,7 @@ if "__main__" == __name__:
                     args.numberOfTrials,
                     args.topNumberOfEvents,
                     args.workDir,
+                    lock,
                 ),
             )
         )
