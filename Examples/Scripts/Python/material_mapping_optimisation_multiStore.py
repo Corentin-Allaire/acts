@@ -34,7 +34,7 @@ from acts import (
 from common import getOpenDataDetector
 
 
-def materialMapping(
+def runMaterialMappingNoTrack(
     trackingGeometry,
     decorators,
     outputDir,
@@ -143,7 +143,7 @@ def runMaterialMappingVariance(binMap, events, job, workDir, pipeResult):
         events=events, numThreads=1, logLevel=acts.logging.INFO
     )
 
-    materialMapping(
+    runMaterialMappingNoTrack(
         trackingGeometry,
         decorators,
         outputDir=pathExp,
@@ -163,21 +163,65 @@ def runMaterialMappingVariance(binMap, events, job, workDir, pipeResult):
     matDecoVar = acts.IMaterialDecorator.fromFile(cborMap)
     detectorVar, trackingGeometryVar, decoratorsVar = getOpenDataDetector(matDecoVar)
 
-    sVar = acts.examples.Sequencer(
-        events=events, numThreads=1, logLevel=acts.logging.INFO
+    s = acts.examples.Sequencer(events=events, numThreads=1, logLevel=acts.logging.INFO)
+    for decorator in decoratorsVar:
+        s.addContextDecorator(decorator)
+    wb = WhiteBoard(acts.logging.ERROR)
+    context = AlgorithmContext(0, 0, wb)
+    for decorator in decoratorsVar:
+        assert decorator.decorate(context) == ProcessCode.SUCCESS
+
+    # Read material step information from a ROOT TTRee
+    reader = RootMaterialTrackReader(
+        level=acts.logging.ERROR,
+        collection="material-tracks",
+        fileList=[os.path.join(workDir, "geant4_material_tracks.root")],
+    )
+    s.addReader(reader)
+
+    stepper = StraightLineStepper()
+    mmAlgCfg = MaterialMapping.Config(context.geoContext, context.magFieldContext)
+    mmAlgCfg.trackingGeometry = trackingGeometryVar
+    mmAlgCfg.collection = "material-tracks"
+
+    if mapSurface:
+        navigator = Navigator(
+            trackingGeometry=trackingGeometryVar,
+            resolveSensitive=True,
+            resolveMaterial=True,
+            resolvePassive=True,
+        )
+        propagator = Propagator(stepper, navigator)
+        surfaceCfg = SurfaceMaterialMapper.Config(
+            computeVariance=True
+        )  # Don't forget to turn the `computeVariance` to true
+        mapper = SurfaceMaterialMapper(
+            config=surfaceCfg, level=acts.logging.ERROR, propagator=propagator
+        )
+        mmAlgCfg.materialSurfaceMapper = mapper
+
+    if mapVolume:
+        navigator = Navigator(
+            trackingGeometry=trackingGeometryVar,
+        )
+        propagator = Propagator(stepper, navigator)
+        mapper = VolumeMaterialMapper(
+            level=acts.logging.ERROR, propagator=propagator, mappingStep=999
+        )
+        mmAlgCfg.materialVolumeMapper = mapper
+
+    jmConverterCfg = MaterialMapJsonConverter.Config(
+        processSensitives=True,
+        processApproaches=True,
+        processRepresenting=True,
+        processBoundaries=True,
+        processVolumes=True,
+        context=context.geoContext,
     )
 
-    materialMapping(
-        trackingGeometryVar,
-        decoratorsVar,
-        outputDir=pathExp,
-        inputDir=workDir,
-        mapName=mapName,
-        format=JsonFormat.Cbor,
-        s=sVar,
-    )
-
-    sVar.run()
+    mapping = MaterialMapping(level=acts.logging.ERROR, config=mmAlgCfg)
+    s.addAlgorithm(mapping)
+    s.run()
 
     # Compute the scoring parameters
     score = dict()
@@ -393,7 +437,7 @@ if "__main__" == __name__:
         scores = resultPipes_parent[job].recv()
         for key in binDict:
             score = scores[key]
-            scorePipes_parent.send(score)
+            scorePipes_parent[key].send(score)
         print("Job number " + str(job) + " is over", flush=True)
 
     if args.doPloting:
