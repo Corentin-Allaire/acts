@@ -34,13 +34,95 @@ from acts import (
 from common import getOpenDataDetector
 
 
+def materialMapping(
+    trackingGeometry,
+    decorators,
+    outputDir,
+    inputDir,
+    mapName="material-map",
+    mapSurface=True,
+    mapVolume=True,
+    format=JsonFormat.Json,
+    s=None,
+):
+    s = s or Sequencer(numThreads=1)
+
+    for decorator in decorators:
+        s.addContextDecorator(decorator)
+
+    wb = WhiteBoard(acts.logging.INFO)
+
+    context = AlgorithmContext(0, 0, wb)
+
+    for decorator in decorators:
+        assert decorator.decorate(context) == ProcessCode.SUCCESS
+
+    # Read material step information from a ROOT TTRee
+    s.addReader(
+        RootMaterialTrackReader(
+            level=acts.logging.INFO,
+            collection="material-tracks",
+            fileList=[os.path.join(inputDir, "geant4_material_tracks.root")],
+        )
+    )
+
+    stepper = StraightLineStepper()
+
+    mmAlgCfg = MaterialMapping.Config(context.geoContext, context.magFieldContext)
+    mmAlgCfg.trackingGeometry = trackingGeometry
+    mmAlgCfg.collection = "material-tracks"
+
+    if mapSurface:
+        navigator = Navigator(
+            trackingGeometry=trackingGeometry,
+            resolveSensitive=True,
+            resolveMaterial=True,
+            resolvePassive=True,
+        )
+        propagator = Propagator(stepper, navigator)
+        mapper = SurfaceMaterialMapper(level=acts.logging.INFO, propagator=propagator)
+        mmAlgCfg.materialSurfaceMapper = mapper
+
+    if mapVolume:
+        navigator = Navigator(
+            trackingGeometry=trackingGeometry,
+        )
+        propagator = Propagator(stepper, navigator)
+        mapper = VolumeMaterialMapper(
+            level=acts.logging.INFO, propagator=propagator, mappingStep=999
+        )
+        mmAlgCfg.materialVolumeMapper = mapper
+
+    jmConverterCfg = MaterialMapJsonConverter.Config(
+        processSensitives=True,
+        processApproaches=True,
+        processRepresenting=True,
+        processBoundaries=True,
+        processVolumes=True,
+        context=context.geoContext,
+    )
+
+    jmw = JsonMaterialWriter(
+        level=acts.logging.VERBOSE,
+        converterCfg=jmConverterCfg,
+        fileName=os.path.join(outputDir, mapName),
+        writeFormat=format,
+    )
+
+    mmAlgCfg.materialWriters = [jmw]
+
+    s.addAlgorithm(MaterialMapping(level=acts.logging.INFO, config=mmAlgCfg))
+
+    return s
+
+
 # Run the material mapping and compute the variance for each bin of each surfaces
 # Return a dict with the GeometryId value of the surface as a key that stores
 # a list of pairs corresponding to the variance and number of tracks associated with each bin of the surface
 def runMaterialMappingVariance(binMap, events, job, workDir, pipeResult):
 
     pathExp = os.path.join(workDir, "Mapping")
-    mapName = "material-map-" + job
+    mapName = "material-map-" + str(job)
     mapSurface = True
     mapVolume = True
 
@@ -61,10 +143,7 @@ def runMaterialMappingVariance(binMap, events, job, workDir, pipeResult):
         events=events, numThreads=1, logLevel=acts.logging.INFO
     )
 
-    # Run the material mapping
-    from material_mapping import runMaterialMapping
-
-    runMaterialMapping(
+    materialMapping(
         trackingGeometry,
         decorators,
         outputDir=pathExp,
@@ -84,65 +163,21 @@ def runMaterialMappingVariance(binMap, events, job, workDir, pipeResult):
     matDecoVar = acts.IMaterialDecorator.fromFile(cborMap)
     detectorVar, trackingGeometryVar, decoratorsVar = getOpenDataDetector(matDecoVar)
 
-    s = acts.examples.Sequencer(events=events, numThreads=1, logLevel=acts.logging.INFO)
-    for decorator in decoratorsVar:
-        s.addContextDecorator(decorator)
-    wb = WhiteBoard(acts.logging.ERROR)
-    context = AlgorithmContext(0, 0, wb)
-    for decorator in decoratorsVar:
-        assert decorator.decorate(context) == ProcessCode.SUCCESS
-
-    # Read material step information from a ROOT TTRee
-    reader = RootMaterialTrackReader(
-        level=acts.logging.ERROR,
-        collection="material-tracks",
-        fileList=[os.path.join(workDir, "geant4_material_tracks.root")],
-    )
-    s.addReader(reader)
-
-    stepper = StraightLineStepper()
-    mmAlgCfg = MaterialMapping.Config(context.geoContext, context.magFieldContext)
-    mmAlgCfg.trackingGeometry = trackingGeometry
-    mmAlgCfg.collection = "material-tracks"
-
-    if mapSurface:
-        navigator = Navigator(
-            trackingGeometry=trackingGeometry,
-            resolveSensitive=True,
-            resolveMaterial=True,
-            resolvePassive=True,
-        )
-        propagator = Propagator(stepper, navigator)
-        surfaceCfg = SurfaceMaterialMapper.Config(
-            computeVariance=True
-        )  # Don't forget to turn the `computeVariance` to true
-        mapper = SurfaceMaterialMapper(
-            config=surfaceCfg, level=acts.logging.ERROR, propagator=propagator
-        )
-        mmAlgCfg.materialSurfaceMapper = mapper
-
-    if mapVolume:
-        navigator = Navigator(
-            trackingGeometry=trackingGeometry,
-        )
-        propagator = Propagator(stepper, navigator)
-        mapper = VolumeMaterialMapper(
-            level=acts.logging.ERROR, propagator=propagator, mappingStep=999
-        )
-        mmAlgCfg.materialVolumeMapper = mapper
-
-    jmConverterCfg = MaterialMapJsonConverter.Config(
-        processSensitives=True,
-        processApproaches=True,
-        processRepresenting=True,
-        processBoundaries=True,
-        processVolumes=True,
-        context=context.geoContext,
+    sVar = acts.examples.Sequencer(
+        events=events, numThreads=1, logLevel=acts.logging.INFO
     )
 
-    mapping = MaterialMapping(level=acts.logging.ERROR, config=mmAlgCfg)
-    s.addAlgorithm(mapping)
-    s.run()
+    materialMapping(
+        trackingGeometryVar,
+        decoratorsVar,
+        outputDir=pathExp,
+        inputDir=workDir,
+        mapName=mapName,
+        format=JsonFormat.Cbor,
+        s=sVar,
+    )
+
+    sVar.run()
 
     # Compute the scoring parameters
     score = dict()
@@ -191,7 +226,7 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
     binMap = dict()
     for job in range(nbJobs):
         trials[job] = experiments.suggest()
-        binMap[job] = (trials.params["x"], trials.params["y"])
+        binMap[job] = (trials[job].params["x"], trials[job].params["y"])
         pipeBin.send(binMap[job])
     print("Binning for surface " + str(key) + " has been sent", flush=True)
     for job in range(nbJobs):
@@ -200,7 +235,7 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
             "Recieved score for job " + str(job) + " and surface " + str(key),
             flush=True,
         )
-        experiments.observe(trials[job], score[job])
+        experiments.observe(trials[job], score)
         print(
             "Score for job "
             + str(job)
@@ -219,19 +254,19 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
         if not os.path.isdir(pathExpSurface):
             os.makedirs(pathExpSurface)
 
-        regret = experiments[key].plot.regret()
+        regret = experiments.plot.regret()
         regret.write_html(pathExpSurface + "/regret.html")
 
-        parallel_coordinates = experiments[key].plot.parallel_coordinates()
+        parallel_coordinates = experiments.plot.parallel_coordinates()
         parallel_coordinates.write_html(pathExpSurface + "/parallel_coordinates.html")
 
-        lpi = experiments[key].plot.lpi()
+        lpi = experiments.plot.lpi()
         lpi.write_html(pathExpSurface + "/lpi.html")
 
-        partial_dependencies = experiments[key].plot.partial_dependencies()
+        partial_dependencies = experiments.plot.partial_dependencies()
         partial_dependencies.write_html(pathExpSurface + "/partial_dependencies.html")
 
-        df = experiments[key].to_pandas()
+        df = experiments.to_pandas()
         best = df.iloc[df.objective.idxmin()]
         print(best)
         resultBinMap = (best.x, best.y)
@@ -264,8 +299,9 @@ if "__main__" == __name__:
         "--dbPath", nargs="?", default="", type=str
     )  # path to the work directory
     parser.add_argument(
-        "--doPloting", nargs="?", default="False", type=bool
+        "--doPloting", action="store_true"
     )  # path to the work directory
+    parser.set_defaults(doPloting=False)
 
     args = parser.parse_args()
 
@@ -315,7 +351,7 @@ if "__main__" == __name__:
 
     for key in binDict:
         binPipes_parent[key], binPipes_child[key] = Pipe()
-        scorePipes_parent[key], scorePipes_parent[key] = Pipe()
+        scorePipes_parent[key], scorePipes_child[key] = Pipe()
         expJob[key] = Process(
             target=surfaceExperiment,
             args=(
@@ -336,7 +372,10 @@ if "__main__" == __name__:
         for key in binDict:
             binMap[key] = binPipes_parent[key].recv()
         print(
-            "Binning for job" + str(job) + "have been selected, now running the mapping"
+            "Binning for job"
+            + str(job)
+            + "have been selected, now running the mapping",
+            flush=True,
         )
         OptiJob[job] = Process(
             target=runMaterialMappingVariance,
@@ -355,15 +394,18 @@ if "__main__" == __name__:
         for key in binDict:
             score = scores[key]
             scorePipes_parent.send(score)
-        print("Job number " + str(job) + " is over")
+        print("Job number " + str(job) + " is over", flush=True)
 
     if args.doPloting:
         # The optimal binning has been found.
         # Run the material mapping one last to obtain a usable material map
-        print("Running the material mapping to obtain the optimised material map")
+        print(
+            "Running the material mapping to obtain the optimised material map",
+            flush=True,
+        )
         resultBinMap = dict()
         for key in binDict:
-            binMap[key] = binPipes_parent[key].recv()
+            resultBinMap[key] = binPipes_parent[key].recv()
         matMapDeco.setBinningMap(resultBinMap)
 
         # Decorate the detector with the MappingMaterialDecorator
