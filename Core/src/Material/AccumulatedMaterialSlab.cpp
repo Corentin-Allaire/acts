@@ -21,9 +21,10 @@ void Acts::AccumulatedMaterialSlab::accumulate(MaterialSlab slab,
 }
 
 void Acts::AccumulatedMaterialSlab::trackVariance(MaterialSlab slabReference) {
-  float variance =
-      (m_totalAverage.thicknessInX0() - slabReference.thicknessInX0()) *
-      (m_totalAverage.thicknessInX0() - slabReference.thicknessInX0());
+  float variance = ((1 / m_trackAverage.material().X0()) -
+                    (1 / slabReference.material().X0())) *
+                   ((1 / m_trackAverage.material().X0()) -
+                    (1 / slabReference.material().X0()));
   if (m_totalCount == 0u) {
     // m_trackAverage.setVarianceInX0(variance, m_totalCount+1.0);
     m_totalVariance = variance;
