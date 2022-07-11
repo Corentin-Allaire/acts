@@ -119,9 +119,20 @@ def runMaterialMappingNoTrack(
 # Run the material mapping and compute the variance for each bin of each surfaces
 # Return a dict with the GeometryId value of the surface as a key that stores
 # a list of pairs corresponding to the variance and number of tracks associated with each bin of the surface
-def runMaterialMappingVariance(binMap, events, job, workDir, pipeResult):
+def runMaterialMappingVariance(binMap, events, job, workDir, pathExp, pipeResult):
+    """
+    Run the material mapping and compute the variance for each bin of each surfaces
+    Return a dict with the GeometryId value of the surface as a key that stores
+    a list of pairs corresponding to the variance and number of tracks associated with each bin of the surface
 
-    pathExp = os.path.join(workDir, "Mapping")
+    binMap : Map containning the binning for each surfaces
+    events : Number of event to use in the mapping
+    job : ID of the job
+    workDir : Directory containing the input geantino track
+    pathExp : Material mapping optimisation path 
+    pipeResult : Pipe to send back the score to the main python instance
+    """
+
     mapName = "material-map-" + str(job)
     mapSurface = True
     mapVolume = True
@@ -143,6 +154,7 @@ def runMaterialMappingVariance(binMap, events, job, workDir, pipeResult):
         events=events, numThreads=1, logLevel=acts.logging.INFO
     )
 
+    # Run the material mapping without writing the material track (as they take too much space)
     runMaterialMappingNoTrack(
         trackingGeometry,
         decorators,
@@ -210,15 +222,6 @@ def runMaterialMappingVariance(binMap, events, job, workDir, pipeResult):
         )
         mmAlgCfg.materialVolumeMapper = mapper
 
-    jmConverterCfg = MaterialMapJsonConverter.Config(
-        processSensitives=True,
-        processApproaches=True,
-        processRepresenting=True,
-        processBoundaries=True,
-        processVolumes=True,
-        context=context.geoContext,
-    )
-
     mapping = MaterialMapping(level=acts.logging.ERROR, config=mmAlgCfg)
     s.addAlgorithm(mapping)
     s.run()
@@ -229,24 +232,34 @@ def runMaterialMappingVariance(binMap, events, job, workDir, pipeResult):
     for key in binMap:
         objective = 0
         binParameters = mapping.scoringParameters(key)
+        # Objective : Sum of variance in all bin divided by the number of bin
         for parameters in binParameters:
             if parameters[1] != 0:
-                objective += parameters[0] / math.sqrt(
-                    parameters[1]
-                )  # Formula for the objective (variance/sqrt(nbTrack))
+                objective += parameters[0]
+                )
+        if len(binParameters) != 0:
+            objective = objective/len(binParameters)   
         score[key] = [dict(name="surface_score", type="objective", value=objective)]
     pipeResult.send(score)
 
     del mapping
     del s
     os.remove(cborMap)
-    os.remove(os.path.join(pathExp, (mapName + "_tracks.root")))
 
-
-# to do
 def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPloting):
-    # Prepare orion experiments
-    # The binning range can be changed by modifying the search space
+    """
+    This function create an experiment for a given single surface 
+    Due to how Orion is implemented only one DB can exist per job, this thus need to be call using pythons multiprocessing to circumvent the issue.
+    
+    key : Id of the surface corresponding to this experiment
+    nbJobs : Total number of jobs to be executed simultaneously
+    pathDB : Path to the databases
+    pathResult : Path to the write the result of the optimisation
+    pipeBin : Pipe use to send the experiment binning to the main python instance
+    pipeResult : Pipe to recive the result of the optimisation
+    doPloting : true if we want to plot the result of the optimisation and obtain the optimal material map
+    """
+    # Create the database
     storage = {
         "database": {
             "name": "database_" + str(key),
@@ -255,10 +268,14 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
             "timeout": 2400,
         },
     }
+    # Create the search space, the range of the binning can be chosen here 
+    # x represent X or phi depending on the type of surface
+    # y represent Y, R or Z depending on the type of surface
     space = {
         "x": "uniform(1, 120, discrete=True)",
         "y": "uniform(1, 120, discrete=True)",
     }
+    # Build the experiment 
     experiments = build_experiment(
         "s_" + str(key),
         version="1",
@@ -268,11 +285,13 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
     )
     trials = dict()
     binMap = dict()
+    # Suggest one binning per job and then send them via the pipe
     for job in range(nbJobs):
         trials[job] = experiments.suggest()
         binMap[job] = (trials[job].params["x"], trials[job].params["y"])
         pipeBin.send(binMap[job])
     print("Binning for surface " + str(key) + " has been sent", flush=True)
+    # Store the score resulting for the jobs in the database
     for job in range(nbJobs):
         score = pipeResult.recv()
         print(
@@ -289,12 +308,11 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
             flush=True,
         )
 
+    # Create some performances plots for each surface
     if doPloting:
         print("All the jobs are over. Now creating the optimisation plots", flush=True)
-        # Create some performances plots for each surface
 
         pathExpSurface = os.path.join(pathResult, "b_" + str(key))
-
         if not os.path.isdir(pathExpSurface):
             os.makedirs(pathExpSurface)
 
@@ -310,19 +328,12 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
         partial_dependencies = experiments.plot.partial_dependencies()
         partial_dependencies.write_html(pathExpSurface + "/partial_dependencies.html")
 
+        # Select the optimal binning and send it via the pipe
         df = experiments.to_pandas()
         best = df.iloc[df.objective.idxmin()]
         print(best)
         resultBinMap = (best.x, best.y)
         pipeBin.send(resultBinMap)
-
-    # if os.path.join(pathDB, "database.pkl") != os.path.join(
-    #     pathStoreDB, "database.pkl"
-    # ):
-    #     shutil.copyfile(
-    #         os.path.join(pathDB, "database.pkl"),
-    #         os.path.join(pathStoreDB, "database.pkl"),
-    #     )
 
 
 if "__main__" == __name__:
@@ -341,15 +352,14 @@ if "__main__" == __name__:
     )  # path to the work directory
     parser.add_argument(
         "--dbPath", nargs="?", default="", type=str
-    )  # path to the work directory
+    )  # path to the database
     parser.add_argument(
         "--doPloting", action="store_true"
-    )  # path to the work directory
+    )  # Return the optimisation plot and create the optimal material map
     parser.set_defaults(doPloting=False)
-
     args = parser.parse_args()
 
-    # CHANGE PATH TO A DICT
+    # Define the useful path and create them if they do not exist
     pathExp = os.path.join(args.workDir, "Mapping")
     pathStoreDB = os.path.join(pathExp, "Database")
     if args.dbPath == "":
@@ -357,7 +367,6 @@ if "__main__" == __name__:
     else:
         pathDB = args.dbPath
     pathResult = os.path.join(pathExp, "Result")
-
     if not os.path.isdir(pathExp):
         os.makedirs(pathExp)
     if not os.path.isdir(pathStoreDB):
@@ -377,11 +386,9 @@ if "__main__" == __name__:
     )
     binDict = matMapDeco.binningMap()
 
-    from multiprocessing import Process, Pipe
+    # Create the pipes that will be used to tranfer data to/from the jobs 
+    from multiprocessing import Process, Pipe    
 
-    # Build one experiment per surface
-    # The binning of the surfaces are independent so we split
-    # an optimisation problem with a large number of variable into a lot of optimisation with 2
     binPipes_child = dict()
     resultPipes_child = dict()
     scorePipes_child = dict()
@@ -393,6 +400,9 @@ if "__main__" == __name__:
     expJob = dict()
     OptiJob = dict()
 
+    # Build one experiment per surface
+    # The binning of the surfaces are independent so we split
+    # an optimisation problem with a large number of variable into a lot of optimisation with 2
     for key in binDict:
         binPipes_parent[key], binPipes_child[key] = Pipe()
         scorePipes_parent[key], scorePipes_child[key] = Pipe()
@@ -410,9 +420,11 @@ if "__main__" == __name__:
         )
         expJob[key].start()
 
+    # Prepare `args.numberOfJobs` material mapping jobs
     for job in range(args.numberOfJobs):
         resultPipes_parent[job], resultPipes_child[job] = Pipe()
         binMap = dict()
+        # Collect the binning for all the surfaces and create a bin map
         for key in binDict:
             binMap[key] = binPipes_parent[key].recv()
         print(
@@ -421,6 +433,7 @@ if "__main__" == __name__:
             + "have been selected, now running the mapping",
             flush=True,
         )
+        # Launch the material mapping with the bin map
         OptiJob[job] = Process(
             target=runMaterialMappingVariance,
             args=(
@@ -428,11 +441,13 @@ if "__main__" == __name__:
                 args.topNumberOfEvents,
                 job,
                 args.workDir,
+                pathExp,
                 resultPipes_child[job],
             ),
         )
         OptiJob[job].start()
 
+    # Collect the score from the material mapping, this pauses the script until all the jobs have been completed
     for job in range(args.numberOfJobs):
         scores = resultPipes_parent[job].recv()
         for key in binDict:
