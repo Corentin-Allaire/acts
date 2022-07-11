@@ -80,9 +80,15 @@ class AccumulatedMaterialSlab {
   /// the average thickness seen by the tracks.
   std::pair<MaterialSlab, unsigned int> totalAverage() const;
 
-  float totalVariance() const;
-
-  unsigned int totalCount() const;
+  /// Return the material variance from all accumulated tracks.
+  ///
+  /// @returns Average material properties and the number of contributing tracks
+  ///
+  /// Only contains the information up to the last `.trackVariance(...)` call.
+  /// If there have been additional calls to `.accumulate(...)` afterwards, the
+  /// information is not part of the total average. The number of tracks is only
+  /// opdated on the call of `.trackAverage(...)`
+  std::pair<float, unsigned int> totalVariance() const;
 
  private:
   /// Averaged properties for a single track.

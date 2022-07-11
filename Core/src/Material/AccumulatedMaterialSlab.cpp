@@ -10,8 +10,6 @@
 
 #include "Acts/Material/detail/AverageMaterials.hpp"
 
-#include <iostream>
-
 void Acts::AccumulatedMaterialSlab::accumulate(MaterialSlab slab,
                                                float pathCorrection) {
   // scale the recorded material to the equivalence contribution along the
@@ -26,13 +24,10 @@ void Acts::AccumulatedMaterialSlab::trackVariance(MaterialSlab slabReference) {
                    ((1 / m_trackAverage.material().X0()) -
                     (1 / slabReference.material().X0()));
   if (m_totalCount == 0u) {
-    // m_trackAverage.setVarianceInX0(variance, m_totalCount+1.0);
     m_totalVariance = variance;
   } else {
     double weightTotal = m_totalCount / (m_totalCount + 1.0);
     double weightTrack = 1 / (m_totalCount + 1.0);
-    // m_trackAverage.setVarianceInX0(weightTotal*m_trackAverage.varianceInX0()
-    // + weightTrack*variance, m_totalCount+1.0);
     m_totalVariance = weightTotal * m_totalVariance + weightTrack * variance;
   }
 }
@@ -63,10 +58,7 @@ Acts::AccumulatedMaterialSlab::totalAverage() const {
   return {m_totalAverage, m_totalCount};
 }
 
-float Acts::AccumulatedMaterialSlab::totalVariance() const {
-  return (m_totalVariance);
-}
-
-unsigned int Acts::AccumulatedMaterialSlab::totalCount() const {
-  return (m_totalCount);
+std::pair<float, unsigned int> Acts::AccumulatedMaterialSlab::totalVariance()
+    const {
+  return (m_totalVariance, m_totalCount);
 }

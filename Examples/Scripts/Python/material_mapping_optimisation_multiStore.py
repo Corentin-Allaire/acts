@@ -129,7 +129,7 @@ def runMaterialMappingVariance(binMap, events, job, workDir, pathExp, pipeResult
     events : Number of event to use in the mapping
     job : ID of the job
     workDir : Directory containing the input geantino track
-    pathExp : Material mapping optimisation path 
+    pathExp : Material mapping optimisation path
     pipeResult : Pipe to send back the score to the main python instance
     """
 
@@ -236,9 +236,8 @@ def runMaterialMappingVariance(binMap, events, job, workDir, pathExp, pipeResult
         for parameters in binParameters:
             if parameters[1] != 0:
                 objective += parameters[0]
-                )
         if len(binParameters) != 0:
-            objective = objective/len(binParameters)   
+            objective = objective / len(binParameters)
         score[key] = [dict(name="surface_score", type="objective", value=objective)]
     pipeResult.send(score)
 
@@ -246,11 +245,12 @@ def runMaterialMappingVariance(binMap, events, job, workDir, pathExp, pipeResult
     del s
     os.remove(cborMap)
 
+
 def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPloting):
     """
-    This function create an experiment for a given single surface 
+    This function create an experiment for a given single surface
     Due to how Orion is implemented only one DB can exist per job, this thus need to be call using pythons multiprocessing to circumvent the issue.
-    
+
     key : Id of the surface corresponding to this experiment
     nbJobs : Total number of jobs to be executed simultaneously
     pathDB : Path to the databases
@@ -268,14 +268,14 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
             "timeout": 2400,
         },
     }
-    # Create the search space, the range of the binning can be chosen here 
+    # Create the search space, the range of the binning can be chosen here
     # x represent X or phi depending on the type of surface
     # y represent Y, R or Z depending on the type of surface
     space = {
         "x": "uniform(1, 120, discrete=True)",
         "y": "uniform(1, 120, discrete=True)",
     }
-    # Build the experiment 
+    # Build the experiment
     experiments = build_experiment(
         "s_" + str(key),
         version="1",
@@ -386,8 +386,8 @@ if "__main__" == __name__:
     )
     binDict = matMapDeco.binningMap()
 
-    # Create the pipes that will be used to tranfer data to/from the jobs 
-    from multiprocessing import Process, Pipe    
+    # Create the pipes that will be used to tranfer data to/from the jobs
+    from multiprocessing import Process, Pipe
 
     binPipes_child = dict()
     resultPipes_child = dict()

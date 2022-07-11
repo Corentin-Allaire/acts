@@ -1,6 +1,6 @@
 // This file is part of the Acts project.
 //
-// Copyright (C) 2017-2019 CERN for the benefit of the Acts project
+// Copyright (C) 2017-2022 CERN for the benefit of the Acts project
 //
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -28,10 +28,12 @@
 
 namespace Acts {
 
-/// @brief Material decorator from Json format
+/// @brief Material decorator using a map as input
 ///
-/// This reads in material maps for surfaces and volumes
-/// from a json file
+/// This reads in map with binning information to decorate the detector with
+/// proto-material for material mapping. This allows us to change the mapping
+/// parameters diectly in the C++ code. Takes a tracking geometry in input, all
+/// the surface with `mapMaterial=true` will be added to a binning map.
 class MappingMaterialDecorator : public IMaterialDecorator {
  public:
   using BinningMap = std::map<uint64_t, std::pair<int, int>>;
@@ -86,6 +88,10 @@ class MappingMaterialDecorator : public IMaterialDecorator {
     }
   }
 
+  /// Loop over all subvolumes and there surfaces and add all the surface with
+  /// protomaterial to the binning map.
+  ///
+  /// @param volume to be looped onto
   void volumeLoop(const Acts::TrackingVolume* tVolume) {
     auto sameId = [tVolume](std::pair<Acts::GeometryIdentifier,
                                       std::shared_ptr<const IVolumeMaterial>>
@@ -161,88 +167,98 @@ class MappingMaterialDecorator : public IMaterialDecorator {
     }
   }
 
+  /// Add protomaterial to a surface bases on the binning map
+  ///
+  /// @param surface protomaterial will be added to
   std::shared_ptr<const Acts::ISurfaceMaterial> binnedSurfaceMaterial(
       std::shared_ptr<const Acts::Surface> surface) const {
-    auto bin = m_binningMap.find(surface->geometryId().value())->second;
+    auto bin = m_binningMap.find(surface->geometryId().value())
+                   Acts::BinUtility bUtility;
+    if (bin == m_binningMap.end()) {
+      ACTS_Warning("The processed surface: "
+                   << surface.geometryId()
+                   << " doesn't have a corrresponding binning in the map "
+                      "returning and empty BinUtility");
+    } else {
+      binning = bin->second;
+      // Check which type of bounds is associated to the surface
+      const Acts::SurfaceBounds& surfaceBounds = surface->bounds();
+      const Acts::RadialBounds* radialBounds =
+          dynamic_cast<const Acts::RadialBounds*>(&surfaceBounds);
+      const Acts::CylinderBounds* cylinderBounds =
+          dynamic_cast<const Acts::CylinderBounds*>(&surfaceBounds);
+      const Acts::AnnulusBounds* annulusBounds =
+          dynamic_cast<const Acts::AnnulusBounds*>(&surfaceBounds);
+      const Acts::RectangleBounds* rectangleBounds =
+          dynamic_cast<const Acts::RectangleBounds*>(&surfaceBounds);
+      const Acts::TrapezoidBounds* trapezoidBounds =
+          dynamic_cast<const Acts::TrapezoidBounds*>(&surfaceBounds);
 
-    Acts::BinUtility bUtility;
-    // Check which type of bounds is associated to the surface
-    const Acts::SurfaceBounds& surfaceBounds = surface->bounds();
-    const Acts::RadialBounds* radialBounds =
-        dynamic_cast<const Acts::RadialBounds*>(&surfaceBounds);
-    const Acts::CylinderBounds* cylinderBounds =
-        dynamic_cast<const Acts::CylinderBounds*>(&surfaceBounds);
-    const Acts::AnnulusBounds* annulusBounds =
-        dynamic_cast<const Acts::AnnulusBounds*>(&surfaceBounds);
-    const Acts::RectangleBounds* rectangleBounds =
-        dynamic_cast<const Acts::RectangleBounds*>(&surfaceBounds);
-    const Acts::TrapezoidBounds* trapezoidBounds =
-        dynamic_cast<const Acts::TrapezoidBounds*>(&surfaceBounds);
-
-    if (radialBounds != nullptr) {
-      bUtility += Acts::BinUtility(
-          bin.first,
-          radialBounds->get(Acts::RadialBounds::eAveragePhi) -
-              radialBounds->get(Acts::RadialBounds::eHalfPhiSector),
-          radialBounds->get(Acts::RadialBounds::eAveragePhi) +
-              radialBounds->get(Acts::RadialBounds::eHalfPhiSector),
-          (radialBounds->get(Acts::RadialBounds::eHalfPhiSector) - M_PI) <
-                  Acts::s_epsilon
-              ? Acts::closed
-              : Acts::open,
-          Acts::binPhi);
-      bUtility +=
-          Acts::BinUtility(bin.second, radialBounds->rMin(),
-                           radialBounds->rMax(), Acts::open, Acts::binR);
-    }
-    if (cylinderBounds != nullptr) {
-      bUtility += Acts::BinUtility(
-          bin.first,
-          cylinderBounds->get(Acts::CylinderBounds::eAveragePhi) -
-              cylinderBounds->get(Acts::CylinderBounds::eHalfPhiSector),
-          cylinderBounds->get(Acts::CylinderBounds::eAveragePhi) +
-              cylinderBounds->get(Acts::CylinderBounds::eHalfPhiSector),
-          (cylinderBounds->get(Acts::CylinderBounds::eHalfPhiSector) - M_PI) <
-                  Acts::s_epsilon
-              ? Acts::closed
-              : Acts::open,
-          Acts::binPhi);
-      bUtility += Acts::BinUtility(
-          bin.second,
-          -1 * cylinderBounds->get(Acts::CylinderBounds::eHalfLengthZ),
-          cylinderBounds->get(Acts::CylinderBounds::eHalfLengthZ), Acts::open,
-          Acts::binZ);
-    }
-    if (annulusBounds != nullptr) {
-      bUtility += Acts::BinUtility(
-          bin.first, annulusBounds->get(Acts::AnnulusBounds::eMinPhiRel),
-          annulusBounds->get(Acts::AnnulusBounds::eMaxPhiRel), Acts::open,
-          Acts::binPhi);
-      bUtility +=
-          Acts::BinUtility(bin.second, annulusBounds->rMin(),
-                           annulusBounds->rMax(), Acts::open, Acts::binR);
-    }
-    if (rectangleBounds != nullptr) {
-      bUtility += Acts::BinUtility(
-          bin.first, rectangleBounds->get(Acts::RectangleBounds::eMinX),
-          rectangleBounds->get(Acts::RectangleBounds::eMaxX), Acts::open,
-          Acts::binX);
-      bUtility += Acts::BinUtility(
-          bin.second, rectangleBounds->get(Acts::RectangleBounds::eMinY),
-          rectangleBounds->get(Acts::RectangleBounds::eMaxY), Acts::open,
-          Acts::binY);
-    }
-    if (trapezoidBounds != nullptr) {
-      double halfLengthX = std::max(
-          trapezoidBounds->get(Acts::TrapezoidBounds::eHalfLengthXnegY),
-          trapezoidBounds->get(Acts::TrapezoidBounds::eHalfLengthXposY));
-      bUtility += Acts::BinUtility(bin.first, -1 * halfLengthX, halfLengthX,
-                                   Acts::open, Acts::binX);
-      bUtility += Acts::BinUtility(
-          bin.second,
-          -1 * trapezoidBounds->get(Acts::TrapezoidBounds::eHalfLengthY),
-          trapezoidBounds->get(Acts::TrapezoidBounds::eHalfLengthY), Acts::open,
-          Acts::binY);
+      if (radialBounds != nullptr) {
+        bUtility += Acts::BinUtility(
+            binning.first,
+            radialBounds->get(Acts::RadialBounds::eAveragePhi) -
+                radialBounds->get(Acts::RadialBounds::eHalfPhiSector),
+            radialBounds->get(Acts::RadialBounds::eAveragePhi) +
+                radialBounds->get(Acts::RadialBounds::eHalfPhiSector),
+            (radialBounds->get(Acts::RadialBounds::eHalfPhiSector) - M_PI) <
+                    Acts::s_epsilon
+                ? Acts::closed
+                : Acts::open,
+            Acts::binPhi);
+        bUtility +=
+            Acts::BinUtility(binning.second, radialBounds->rMin(),
+                             radialBounds->rMax(), Acts::open, Acts::binR);
+      }
+      if (cylinderBounds != nullptr) {
+        bUtility += Acts::BinUtility(
+            binning.first,
+            cylinderBounds->get(Acts::CylinderBounds::eAveragePhi) -
+                cylinderBounds->get(Acts::CylinderBounds::eHalfPhiSector),
+            cylinderBounds->get(Acts::CylinderBounds::eAveragePhi) +
+                cylinderBounds->get(Acts::CylinderBounds::eHalfPhiSector),
+            (cylinderBounds->get(Acts::CylinderBounds::eHalfPhiSector) - M_PI) <
+                    Acts::s_epsilon
+                ? Acts::closed
+                : Acts::open,
+            Acts::binPhi);
+        bUtility += Acts::BinUtility(
+            binning.second,
+            -1 * cylinderBounds->get(Acts::CylinderBounds::eHalfLengthZ),
+            cylinderBounds->get(Acts::CylinderBounds::eHalfLengthZ), Acts::open,
+            Acts::binZ);
+      }
+      if (annulusBounds != nullptr) {
+        bUtility += Acts::BinUtility(
+            binning.first, annulusBounds->get(Acts::AnnulusBounds::eMinPhiRel),
+            annulusBounds->get(Acts::AnnulusBounds::eMaxPhiRel), Acts::open,
+            Acts::binPhi);
+        bUtility +=
+            Acts::BinUtility(binning.second, annulusBounds->rMin(),
+                             annulusBounds->rMax(), Acts::open, Acts::binR);
+      }
+      if (rectangleBounds != nullptr) {
+        bUtility += Acts::BinUtility(
+            binning.first, rectangleBounds->get(Acts::RectangleBounds::eMinX),
+            rectangleBounds->get(Acts::RectangleBounds::eMaxX), Acts::open,
+            Acts::binX);
+        bUtility += Acts::BinUtility(
+            binning.second, rectangleBounds->get(Acts::RectangleBounds::eMinY),
+            rectangleBounds->get(Acts::RectangleBounds::eMaxY), Acts::open,
+            Acts::binY);
+      }
+      if (trapezoidBounds != nullptr) {
+        double halfLengthX = std::max(
+            trapezoidBounds->get(Acts::TrapezoidBounds::eHalfLengthXnegY),
+            trapezoidBounds->get(Acts::TrapezoidBounds::eHalfLengthXposY));
+        bUtility += Acts::BinUtility(binning.first, -1 * halfLengthX,
+                                     halfLengthX, Acts::open, Acts::binX);
+        bUtility += Acts::BinUtility(
+            binning.second,
+            -1 * trapezoidBounds->get(Acts::TrapezoidBounds::eHalfLengthY),
+            trapezoidBounds->get(Acts::TrapezoidBounds::eHalfLengthY),
+            Acts::open, Acts::binY);
+      }
     }
     return std::make_shared<Acts::ProtoSurfaceMaterial>(bUtility);
   }

@@ -136,8 +136,9 @@ ActsExamples::MaterialMapping::scoringParameters(uint64_t surfaceID) {
           surfaceAccumulatedMaterial->second.accumulatedMaterial();
       for (const auto& vectorMaterial : matrixMaterial) {
         for (const auto& AccumulatedMaterial : vectorMaterial) {
-          scoringParameters.push_back({AccumulatedMaterial.totalVariance(),
-                                       AccumulatedMaterial.totalCount()});
+          auto totalVariance = AccumulatedMaterial.totalVariance();
+          scoringParameters.push_back(
+              {totalVariance.first, totalVariance.second});
         }
       }
     }
