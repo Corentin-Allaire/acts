@@ -324,6 +324,14 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
     for job in range(nbJobs):
         trials[job] = experiments.suggest()
         binMap[job] = (trials[job].params["x"], trials[job].params["y"])
+        print(
+            "Binning for job "
+            + str(job)
+            + " and surface "
+            + str(key)
+            + " has been selected",
+            flush=True,
+        )
         pipeBin.send(binMap[job])
     print("Binning for surface " + str(key) + " has been sent", flush=True)
     # Store the score resulting for the jobs in the database
