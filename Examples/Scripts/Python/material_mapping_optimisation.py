@@ -250,6 +250,7 @@ def runMaterialMappingVariance(binMap, events, job, inputPath, pathExp, pipeResu
         if nonZero != 0:
             objective = objective / nonZero
         score[key] = [dict(name="surface_score", type="objective", value=objective)]
+    print("Mapping over for job " + str(job) + " : now sending score", flush=True)
     pipeResult.send(score)
 
     del mapping
@@ -333,7 +334,7 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
             flush=True,
         )
         pipeBin.send(binMap[job])
-    print("Binning for surface " + str(key) + " has been sent", flush=True)
+    print("All binning for surface " + str(key) + " has been sent", flush=True)
     # Store the score resulting for the jobs in the database
     for job in range(nbJobs):
         score = pipeResult.recv()
@@ -489,6 +490,7 @@ if "__main__" == __name__:
     # Collect the score from the material mapping, this pauses the script until all the jobs have been completed
     for job in range(args.numberOfJobs):
         scores = resultPipes_parent[job].recv()
+        print("Retried score for job " + str(job), flush=True)
         for key in binDict:
             score = scores[key]
             scorePipes_parent[key].send(score)
