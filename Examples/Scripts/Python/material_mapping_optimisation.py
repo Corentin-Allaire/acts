@@ -132,19 +132,25 @@ def runMaterialMappingVariance(binMap, events, job, inputPath, pathExp, pipeResu
     pathExp : Material mapping optimisation path
     pipeResult : Pipe to send back the score to the main python instance
     """
-
+    print("Start job " + str(job), flush=True)
     mapName = "material-map-" + str(job)
     mapSurface = True
     mapVolume = True
 
     # Create a MappingMaterialDecorator based on the tracking geometry
-    matDeco = acts.IMaterialDecorator.fromFile(str(os.path.join(inputPath, "geometry-map.json")))
+    matDeco = acts.IMaterialDecorator.fromFile(
+        str(os.path.join(inputPath, "geometry-map.json"))
+    )
     detectorTemp, trackingGeometryTemp, decoratorsTemp = getOpenDataDetector(matDeco)
     matMapDeco = acts.MappingMaterialDecorator(
         tGeometry=trackingGeometryTemp, level=acts.logging.ERROR
     )
     # Update the binning using the bin map corresponding to this trial
     matMapDeco.setBinningMap(binMap)
+
+    del detectorTemp
+    del trackingGeometryTemp
+    del decoratorsTemp
 
     # Decorate the detector with the MappingMaterialDecorator
     detector, trackingGeometry, decorators = getOpenDataDetector(matMapDeco)
@@ -167,6 +173,9 @@ def runMaterialMappingVariance(binMap, events, job, inputPath, pathExp, pipeResu
 
     sMap.run()
     del sMap  # Need to be deleted to write the material map to cbor
+    del detector
+    del trackingGeometry
+    del decorators
 
     # Compute the variance by rerunning the mapping
     print("Job " + str(job) + ": second pass to compute the variance", flush=True)
@@ -237,7 +246,7 @@ def runMaterialMappingVariance(binMap, events, job, inputPath, pathExp, pipeResu
         for parameters in binParameters:
             if parameters[1] != 0:
                 objective += parameters[0]
-                nonZero +=1
+                nonZero += 1
         if nonZero != 0:
             objective = objective / nonZero
         score[key] = [dict(name="surface_score", type="objective", value=objective)]
@@ -245,6 +254,9 @@ def runMaterialMappingVariance(binMap, events, job, inputPath, pathExp, pipeResu
 
     del mapping
     del s
+    del detectorVar
+    del trackingGeometryVar
+    del decoratorsVar
     os.remove(cborMap)
 
 
@@ -384,23 +396,19 @@ if "__main__" == __name__:
 
     # Define the useful path and create them if they do not exist
     pathExp = os.path.join(args.outputPath, "Mapping")
-    pathStoreDB = os.path.join(pathExp, "Database")
-    if args.dbPath == "":
-        pathDB = pathStoreDB
-    else:
-        pathDB = args.dbPath
+    pathDB = os.path.join(pathExp, "Database")
     pathResult = os.path.join(pathExp, "Result")
     if not os.path.isdir(pathExp):
         os.makedirs(pathExp)
-    if not os.path.isdir(pathStoreDB):
-        os.makedirs(pathStoreDB)
     if not os.path.isdir(pathDB):
         os.makedirs(pathDB)
     if not os.path.isdir(pathResult):
         os.makedirs(pathResult)
 
     # Create the tracking geometry, uses the json file to configure the proto-surfaces
-    matDeco = acts.IMaterialDecorator.fromFile(str(os.path.join(args.inputPath, "geometry-map.json")))
+    matDeco = acts.IMaterialDecorator.fromFile(
+        str(os.path.join(args.inputPath, "geometry-map.json"))
+    )
     detector, trackingGeometry, decorators = getOpenDataDetector(matDeco)
 
     # Use the MappingMaterialDecorator to create a binning map that can be optimised
@@ -477,6 +485,10 @@ if "__main__" == __name__:
             score = scores[key]
             scorePipes_parent[key].send(score)
         print("Job number " + str(job) + " is over", flush=True)
+
+    print("Waiting for all the score to have been stored", flush=True)
+    for key in binDict:
+        expJob[key].join()
 
     if args.doPloting:
         # The optimal binning has been found.
