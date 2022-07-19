@@ -132,7 +132,7 @@ def runMaterialMappingVariance(binMap, events, job, inputPath, pathExp, pipeResu
     pathExp : Material mapping optimisation path
     pipeResult : Pipe to send back the score to the main python instance
     """
-    print("Start job " + str(job), flush=True)
+    print("Start mapping for job " + str(job), flush=True)
     mapName = "material-map-" + str(job)
     mapSurface = True
     mapVolume = True
@@ -257,7 +257,7 @@ def runMaterialMappingVariance(binMap, events, job, inputPath, pathExp, pipeResu
     del detectorVar
     del trackingGeometryVar
     del decoratorsVar
-    os.remove(pathExp + "/" + cborMap)
+    os.remove(cborMap)
 
 
 def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPloting):
@@ -459,9 +459,9 @@ if "__main__" == __name__:
         for key in binDict:
             binMap[key] = binPipes_parent[key].recv()
         print(
-            "Binning for job"
+            "Binning for job "
             + str(job)
-            + "have been selected, now running the mapping",
+            + " have been selected, now running the mapping",
             flush=True,
         )
         # Launch the material mapping with the bin map
