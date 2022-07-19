@@ -257,7 +257,7 @@ def runMaterialMappingVariance(binMap, events, job, inputPath, pathExp, pipeResu
     del detectorVar
     del trackingGeometryVar
     del decoratorsVar
-    os.remove(cborMap)
+    os.remove(pathExp + "/" + cborMap)
 
 
 def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPloting):
