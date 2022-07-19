@@ -30,7 +30,7 @@ def runMaterialRecording(g4geo, outputDir, tracksPerEvent=10000, s=None):
 
     rnd = RandomNumbers(seed=228)
 
-    s = s or acts.examples.Sequencer(events=2, numThreads=1)
+    s = s or acts.examples.Sequencer(events=100000, numThreads=1)
 
     evGen = EventGenerator(
         level=acts.logging.INFO,

@@ -119,7 +119,7 @@ def runMaterialMappingNoTrack(
 # Run the material mapping and compute the variance for each bin of each surfaces
 # Return a dict with the GeometryId value of the surface as a key that stores
 # a list of pairs corresponding to the variance and number of tracks associated with each bin of the surface
-def runMaterialMappingVariance(binMap, events, job, workDir, pathExp, pipeResult):
+def runMaterialMappingVariance(binMap, events, job, inputPath, pathExp, pipeResult):
     """
     Run the material mapping and compute the variance for each bin of each surfaces
     Return a dict with the GeometryId value of the surface as a key that stores
@@ -128,7 +128,7 @@ def runMaterialMappingVariance(binMap, events, job, workDir, pathExp, pipeResult
     binMap : Map containning the binning for each surfaces
     events : Number of event to use in the mapping
     job : ID of the job
-    workDir : Directory containing the input geantino track
+    inputPath : Directory containing the input geantino track and the json geometry
     pathExp : Material mapping optimisation path
     pipeResult : Pipe to send back the score to the main python instance
     """
@@ -138,7 +138,7 @@ def runMaterialMappingVariance(binMap, events, job, workDir, pathExp, pipeResult
     mapVolume = True
 
     # Create a MappingMaterialDecorator based on the tracking geometry
-    matDeco = acts.IMaterialDecorator.fromFile("geometry-map.json")
+    matDeco = acts.IMaterialDecorator.fromFile(str(os.path.join(inputPath, "geometry-map.json")))
     detectorTemp, trackingGeometryTemp, decoratorsTemp = getOpenDataDetector(matDeco)
     matMapDeco = acts.MappingMaterialDecorator(
         tGeometry=trackingGeometryTemp, level=acts.logging.ERROR
@@ -159,7 +159,7 @@ def runMaterialMappingVariance(binMap, events, job, workDir, pathExp, pipeResult
         trackingGeometry,
         decorators,
         outputDir=pathExp,
-        inputDir=workDir,
+        inputDir=inputPath,
         mapName=mapName,
         format=JsonFormat.Cbor,
         s=sMap,
@@ -187,7 +187,7 @@ def runMaterialMappingVariance(binMap, events, job, workDir, pathExp, pipeResult
     reader = RootMaterialTrackReader(
         level=acts.logging.ERROR,
         collection="material-tracks",
-        fileList=[os.path.join(workDir, "geant4_material_tracks.root")],
+        fileList=[os.path.join(inputPath, "geant4_material_tracks.root")],
     )
     s.addReader(reader)
 
@@ -231,13 +231,15 @@ def runMaterialMappingVariance(binMap, events, job, workDir, pathExp, pipeResult
 
     for key in binMap:
         objective = 0
+        nonZero = 0
         binParameters = mapping.scoringParameters(key)
         # Objective : Sum of variance in all bin divided by the number of bin
         for parameters in binParameters:
             if parameters[1] != 0:
                 objective += parameters[0]
-        if len(binParameters) != 0:
-            objective = objective / len(binParameters)
+                nonZero +=1
+        if nonZero != 0:
+            objective = objective / nonZero
         score[key] = [dict(name="surface_score", type="objective", value=objective)]
     pipeResult.send(score)
 
@@ -280,6 +282,27 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
         "s_" + str(key),
         version="1",
         space=space,
+        algorithms="random",
+        # algorithms="tpe":{
+        #     "seed": null
+        #     "n_initial_points": 20
+        #     "n_ei_candidates": 25
+        #     "gamma": 0.25
+        #     "equal_weight": False
+        #     "prior_weight": 1.0
+        #     "full_weight_num": 25
+        #     "parallel_strategy":{
+        #         "of_type": StatusBasedParallelStrategy
+        #         "strategy_configs":{
+        #             "broken":{
+        #                 "of_type": MaxParallelStrategy
+        #             }
+        #         }
+        #         "default_strategy":{
+        #             "of_type": NoParallelStrategy
+        #         }
+        #     }
+        # },
         storage=storage,
         max_idle_time=2400,
     )
@@ -348,11 +371,11 @@ if "__main__" == __name__:
         "--topNumberOfEvents", nargs="?", default=100, type=int
     )  # number of events per trials
     parser.add_argument(
-        "--workDir", nargs="?", default=os.getcwd(), type=str
-    )  # path to the work directory
+        "--inputPath", nargs="?", default=os.getcwd(), type=str
+    )  # path to the input
     parser.add_argument(
-        "--dbPath", nargs="?", default="", type=str
-    )  # path to the database
+        "--outputPath", nargs="?", default="", type=str
+    )  # path to the output
     parser.add_argument(
         "--doPloting", action="store_true"
     )  # Return the optimisation plot and create the optimal material map
@@ -360,7 +383,7 @@ if "__main__" == __name__:
     args = parser.parse_args()
 
     # Define the useful path and create them if they do not exist
-    pathExp = os.path.join(args.workDir, "Mapping")
+    pathExp = os.path.join(args.outputPath, "Mapping")
     pathStoreDB = os.path.join(pathExp, "Database")
     if args.dbPath == "":
         pathDB = pathStoreDB
@@ -377,7 +400,7 @@ if "__main__" == __name__:
         os.makedirs(pathResult)
 
     # Create the tracking geometry, uses the json file to configure the proto-surfaces
-    matDeco = acts.IMaterialDecorator.fromFile("geometry-map.json")
+    matDeco = acts.IMaterialDecorator.fromFile(str(os.path.join(args.inputPath, "geometry-map.json")))
     detector, trackingGeometry, decorators = getOpenDataDetector(matDeco)
 
     # Use the MappingMaterialDecorator to create a binning map that can be optimised
@@ -440,7 +463,7 @@ if "__main__" == __name__:
                 binMap,
                 args.topNumberOfEvents,
                 job,
-                args.workDir,
+                args.inputPath,
                 pathExp,
                 resultPipes_child[job],
             ),
@@ -483,8 +506,8 @@ if "__main__" == __name__:
         runMaterialMapping(
             resultTrackingGeometry,
             resultDecorators,
-            outputDir=args.workDir,
-            inputDir=args.workDir,
+            outputDir=args.inputPath,
+            inputDir=args.outputPath,
             mapName="optimised-material-map",
             format=JsonFormat.Cbor,
             s=rMap,
