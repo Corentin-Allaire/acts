@@ -32,6 +32,7 @@ from acts import (
 )
 
 from common import getOpenDataDetector
+from datetime import datetime
 
 
 def runMaterialMappingNoTrack(
@@ -132,10 +133,13 @@ def runMaterialMappingVariance(binMap, events, job, inputPath, pathExp, pipeResu
     pathExp : Material mapping optimisation path
     pipeResult : Pipe to send back the score to the main python instance
     """
-    print("Start mapping for job " + str(job), flush=True)
+    print(
+        datetime.now().strftime("%H:%M:%S") + "    Start mapping for job " + str(job),
+        flush=True,
+    )
     mapName = "material-map-" + str(job)
     mapSurface = True
-    mapVolume = True
+    mapVolume = False
 
     # Create a MappingMaterialDecorator based on the tracking geometry
     matDeco = acts.IMaterialDecorator.fromFile(
@@ -168,6 +172,7 @@ def runMaterialMappingVariance(binMap, events, job, inputPath, pathExp, pipeResu
         inputDir=inputPath,
         mapName=mapName,
         format=JsonFormat.Cbor,
+        mapVolume=mapVolume,
         s=sMap,
     )
 
@@ -178,7 +183,13 @@ def runMaterialMappingVariance(binMap, events, job, inputPath, pathExp, pipeResu
     del decorators
 
     # Compute the variance by rerunning the mapping
-    print("Job " + str(job) + ": second pass to compute the variance", flush=True)
+    print(
+        datetime.now().strftime("%H:%M:%S")
+        + "    Job "
+        + str(job)
+        + ": second pass to compute the variance",
+        flush=True,
+    )
     # Use the material map from the previous mapping as an input
     cborMap = os.path.join(pathExp, (mapName + ".cbor"))
     matDecoVar = acts.IMaterialDecorator.fromFile(cborMap)
@@ -250,7 +261,13 @@ def runMaterialMappingVariance(binMap, events, job, inputPath, pathExp, pipeResu
         if nonZero != 0:
             objective = objective / nonZero
         score[key] = [dict(name="surface_score", type="objective", value=objective)]
-    print("Mapping over for job " + str(job) + " : now sending score", flush=True)
+    print(
+        datetime.now().strftime("%H:%M:%S")
+        + "    Mapping over for job "
+        + str(job)
+        + " : now sending score",
+        flush=True,
+    )
     pipeResult.send(score)
 
     del mapping
@@ -326,7 +343,8 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
         trials[job] = experiments.suggest()
         binMap[job] = (trials[job].params["x"], trials[job].params["y"])
         print(
-            "Binning for job "
+            datetime.now().strftime("%H:%M:%S")
+            + "    Binning for job "
             + str(job)
             + " and surface "
             + str(key)
@@ -334,17 +352,28 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
             flush=True,
         )
         pipeBin.send(binMap[job])
-    print("All binning for surface " + str(key) + " has been sent", flush=True)
+    print(
+        datetime.now().strftime("%H:%M:%S")
+        + "    All binning for surface "
+        + str(key)
+        + " has been sent",
+        flush=True,
+    )
     # Store the score resulting for the jobs in the database
     for job in range(nbJobs):
         score = pipeResult.recv()
         print(
-            "Recieved score for job " + str(job) + " and surface " + str(key),
+            datetime.now().strftime("%H:%M:%S")
+            + "    Recieved score for job "
+            + str(job)
+            + " and surface "
+            + str(key),
             flush=True,
         )
         experiments.observe(trials[job], score)
         print(
-            "Score for job "
+            datetime.now().strftime("%H:%M:%S")
+            + "    Score for job "
             + str(job)
             + " and surface "
             + str(key)
@@ -354,7 +383,11 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
 
     # Create some performances plots for each surface
     if doPloting:
-        print("All the jobs are over. Now creating the optimisation plots", flush=True)
+        print(
+            datetime.now().strftime("%H:%M:%S")
+            + "    All the jobs are over. Now creating the optimisation plots",
+            flush=True,
+        )
 
         pathExpSurface = os.path.join(pathResult, "b_" + str(key))
         if not os.path.isdir(pathExpSurface):
@@ -382,7 +415,7 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
 
 if "__main__" == __name__:
 
-    print("Starting")
+    print(datetime.now().strftime("%H:%M:%S") + "    Starting")
     # Optimiser arguents
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -468,7 +501,8 @@ if "__main__" == __name__:
         for key in binDict:
             binMap[key] = binPipes_parent[key].recv()
         print(
-            "Binning for job "
+            datetime.now().strftime("%H:%M:%S")
+            + "    Binning for job "
             + str(job)
             + " have been selected, now running the mapping",
             flush=True,
@@ -490,21 +524,29 @@ if "__main__" == __name__:
     # Collect the score from the material mapping, this pauses the script until all the jobs have been completed
     for job in range(args.numberOfJobs):
         scores = resultPipes_parent[job].recv()
-        print("Retried score for job " + str(job), flush=True)
+        print(
+            datetime.now().strftime("%H:%M:%S")
+            + "    Retried score for job "
+            + str(job),
+            flush=True,
+        )
         for key in binDict:
             score = scores[key]
             scorePipes_parent[key].send(score)
-        print("Job number " + str(job) + " is over", flush=True)
-
-    print("Waiting for all the score to have been stored", flush=True)
-    for key in binDict:
-        expJob[key].join()
+        print(
+            datetime.now().strftime("%H:%M:%S")
+            + "    Job number "
+            + str(job)
+            + " is over",
+            flush=True,
+        )
 
     if args.doPloting:
         # The optimal binning has been found.
         # Run the material mapping one last to obtain a usable material map
         print(
-            "Running the material mapping to obtain the optimised material map",
+            datetime.now().strftime("%H:%M:%S")
+            + "    Running the material mapping to obtain the optimised material map",
             flush=True,
         )
         resultBinMap = dict()
@@ -528,12 +570,29 @@ if "__main__" == __name__:
         runMaterialMapping(
             resultTrackingGeometry,
             resultDecorators,
-            outputDir=args.inputPath,
-            inputDir=args.outputPath,
+            outputDir=args.outputPath,
+            inputDir=args.inputPath,
             mapName="optimised-material-map",
             format=JsonFormat.Cbor,
+            mapVolume=False,
             s=rMap,
         )
 
         rMap.run()
         del rMap  # Need to be deleted to write the material map to cbor
+
+    print(
+        datetime.now().strftime("%H:%M:%S")
+        + "    Waiting for all the score to have been stored",
+        flush=True,
+    )
+    for key in binDict:
+        expJob[key].join(timeout=300)
+        expJob[key].terminate()
+        print(
+            datetime.now().strftime("%H:%M:%S")
+            + "    Experiment for surface "
+            + str(key)
+            + " is over",
+            flush=True,
+        )
