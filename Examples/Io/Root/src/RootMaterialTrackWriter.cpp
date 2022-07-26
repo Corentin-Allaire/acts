@@ -227,14 +227,12 @@ ActsExamples::ProcessCode ActsExamples::RootMaterialTrackWriter::writeT(
         const Acts::Surface* surface = mint.surface;
         Acts::GeometryIdentifier slayerID;
         if (surface) {
-          auto sfIntersection = surface->intersect(
-              ctx.geoContext, mint.position, mint.direction, true);
-          slayerID = surface->geometryId();
+          slayerID = mint.intersectionID;
           m_sur_id.push_back(slayerID.value());
           m_sur_type.push_back(surface->type());
-          m_sur_x.push_back(sfIntersection.intersection.position.x());
-          m_sur_y.push_back(sfIntersection.intersection.position.y());
-          m_sur_z.push_back(sfIntersection.intersection.position.z());
+          m_sur_x.push_back(mint.intersection.x());
+          m_sur_y.push_back(mint.intersection.y());
+          m_sur_z.push_back(mint.intersection.z());
 
           const Acts::SurfaceBounds& surfaceBounds = surface->bounds();
           const Acts::RadialBounds* radialBounds =
@@ -276,7 +274,7 @@ ActsExamples::ProcessCode ActsExamples::RootMaterialTrackWriter::writeT(
         const Acts::Volume* volume = mint.volume;
         Acts::GeometryIdentifier vlayerID;
         if (volume) {
-          vlayerID = volume->geometryId();
+          vlayerID = mint.intersectionID;
           m_vol_id.push_back(vlayerID.value());
         } else {
           vlayerID.setVolume(0);
