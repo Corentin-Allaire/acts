@@ -380,6 +380,9 @@ void Acts::SurfaceMaterialMapper::mapMaterialTrack(
     ++assignedMaterial[currentID];
     // Update the material interaction with the associated surface
     rmIter->surface = sfIter->surface;
+    rmIter->intersection = rmIter->position;
+    rmIter->intersectionID = currentID;
+    rmIter->pathCorrection = currentPathCorrection;
     // Switch to next material
     ++rmIter;
   }
@@ -415,7 +418,8 @@ void Acts::SurfaceMaterialMapper::mapMaterialTrack(
           missedMaterial->second.trackVariance(
               mSurface.position,
               mState.inputSurfaceMaterial[currentID]->materialSlab(
-                  mSurface.position));
+                  mSurface.position),
+              true);
         }
         missedMaterial->second.trackAverage(mSurface.position, true);
       }
