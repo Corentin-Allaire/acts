@@ -408,7 +408,11 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
         # Select the optimal binning and send it via the pipe
         df = experiments.to_pandas()
         best = df.iloc[df.objective.idxmin()]
-        print(best)
+        print(
+            datetime.now().strftime("%H:%M:%S")
+            + "    Best score for surface " + str(key) + " : " + str(best),
+            flush=True,
+        )        
         resultBinMap = (best.x, best.y)
         pipeBin.send(resultBinMap)
 
@@ -458,7 +462,7 @@ if "__main__" == __name__:
         tGeometry=trackingGeometry, level=acts.logging.WARNING
     )
     binDict = matMapDeco.binningMap()
-
+    del detector, decorators
     # Create the pipes that will be used to tranfer data to/from the jobs
     from multiprocessing import Process, Pipe
 
@@ -573,14 +577,14 @@ if "__main__" == __name__:
             outputDir=args.outputPath,
             inputDir=args.inputPath,
             mapName="optimised-material-map",
-            format=JsonFormat.Cbor,
+            format=JsonFormat.Json,
             mapVolume=False,
             s=rMap,
         )
 
         rMap.run()
-        del rMap  # Need to be deleted to write the material map to cbor
-
+        del rMap   # Need to be deleted to write the material map to cbor
+        del resultDetector, resultTrackingGeometry, resultDecorators
     print(
         datetime.now().strftime("%H:%M:%S")
         + "    Waiting for all the score to have been stored",

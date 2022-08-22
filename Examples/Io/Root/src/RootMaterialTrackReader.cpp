@@ -50,10 +50,10 @@ ActsExamples::RootMaterialTrackReader::RootMaterialTrackReader(
   m_inputChain->SetBranchAddress("mat_Z", &m_step_Z);
   m_inputChain->SetBranchAddress("mat_rho", &m_step_rho);
   if (m_cfg.readSurface) {
-    m_inputChain->Branch("sur_id", &m_sur_id);
-    m_inputChain->Branch("sur_x", &m_sur_x);
-    m_inputChain->Branch("sur_y", &m_sur_y);
-    m_inputChain->Branch("sur_z", &m_sur_z);
+    m_inputChain->SetBranchAddress("sur_id", &m_sur_id);
+    m_inputChain->SetBranchAddress("sur_x", &m_sur_x);
+    m_inputChain->SetBranchAddress("sur_y", &m_sur_y);
+    m_inputChain->SetBranchAddress("sur_z", &m_sur_z);
   }
 
   if (m_cfg.fileList.empty()) {
@@ -164,10 +164,13 @@ ActsExamples::ProcessCode ActsExamples::RootMaterialTrackReader::read(
                                             (*m_step_Z)[is], (*m_step_rho)[is]),
             s);
         if (m_cfg.readSurface) {
+          // std::cout << "bip" << std::endl;
           mInteraction.intersectionID =
               Acts::GeometryIdentifier((*m_sur_id)[is]);
+          // std::cout << "bip2" << std::endl;
           mInteraction.intersection =
               Acts::Vector3((*m_sur_x)[is], (*m_sur_y)[is], (*m_sur_z)[is]);
+          // std::cout << "bip3" << std::endl;
         } else {
           mInteraction.intersectionID = Acts::GeometryIdentifier();
           mInteraction.intersection = Acts::Vector3(0, 0, 0);
