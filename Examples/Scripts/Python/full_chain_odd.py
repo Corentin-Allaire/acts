@@ -3,7 +3,8 @@ import argparse
 import pathlib, acts, acts.examples
 import acts.examples.dd4hep
 from common import getOpenDataDetector, getOpenDataDetectorDirectory
-
+from pythia8 import addPythia8
+from pathlib import Path
 
 u = acts.UnitConstants
 outputDir = pathlib.Path.cwd() / "odd_output"
@@ -26,45 +27,82 @@ from digitization import addDigitization
 from seeding import addSeeding, SeedingAlgorithm, TruthSeedRanges
 from ckf_tracks import addCKFTracks
 
-s = acts.examples.Sequencer(events=100, numThreads=-1, logLevel=acts.logging.INFO)
+s = acts.examples.Sequencer(events=1000, numThreads=2, logLevel=acts.logging.INFO)
 
-s = addParticleGun(
-    s,
-    MomentumConfig(1.0 * u.GeV, 10.0 * u.GeV, True),
-    EtaConfig(-3.0, 3.0, True),
-    ParticleConfig(1, acts.PdgParticle.eMuon, True),
-    rnd=rnd,
+evGen = addPythia8(s, rnd, hardProcess = ["Top:qqbar2ttbar=on"], npileup=200)
+
+s.addAlgorithm(
+    acts.examples.ParticleSelector(
+        level=s.config.logLevel,
+        inputParticles="particles_input",
+        outputParticles="particles_selected",
+        removeNeutral=True,
+        absEtaMax=4,
+        rhoMax=4.0 * u.mm,
+        ptMin=500 * u.MeV,
+        )
+    )
+
+# Simulation
+simAlg = acts.examples.FatrasSimulation(
+    level=acts.logging.INFO,
+    inputParticles="particles_selected",
+    outputParticlesInitial="particles_initial",
+    outputParticlesFinal="particles_final",
+    outputSimHits="simhits",
+    randomNumbers=rnd,
+    trackingGeometry=trackingGeometry,
+    magneticField=field,
+    generateHitsOnSensitive=True,
 )
-s = addFatras(
-    s,
-    trackingGeometry,
-    field,
-    outputDirRoot=outputDir,
-    rnd=rnd,
+
+s.addAlgorithm(simAlg)
+
+# Output
+s.addWriter(
+    acts.examples.CsvParticleWriter(
+        level=acts.logging.INFO,
+        outputDir=str(outputDir),
+        inputParticles="particles_final",
+        outputStem="particles_final",
+    )
 )
+
+s.addWriter(
+    acts.examples.CsvSimHitWriter(
+        level=acts.logging.INFO,
+        inputSimHits="simhits",
+        outputDir=str(outputDir),
+        outputStem="hits",
+    )
+)
+
 s = addDigitization(
     s,
     trackingGeometry,
     field,
     digiConfigFile=oddDigiConfig,
-    outputDirRoot=outputDir,
+    # outputDirRoot=outputDir,
+    outputDirCsv=outputDir,
     rnd=rnd,
 )
 s = addSeeding(
     s,
     trackingGeometry,
     field,
-    TruthSeedRanges(pt=(1.0 * u.GeV, None), eta=(-2.7, 2.7), nHits=(9, None)),
+    TruthSeedRanges(pt=(1.0*u.GeV, None), eta=(-2.7, 2.7), nHits=(9, None)),
+    # seedingAlgorithm=SeedingAlgorithm.TruthSmeared,
     geoSelectionConfigFile=oddSeedingSel,
-    outputDirRoot=outputDir,
+    # outputDirRoot=outputDir,
     initialVarInflation=[100, 100, 100, 100, 100, 100],
 )
 s = addCKFTracks(
     s,
     trackingGeometry,
     field,
-    TruthSeedRanges(pt=(400.0 * u.MeV, None), nHits=(6, None)),
-    outputDirRoot=outputDir,
+    TruthSeedRanges(pt=(1.0 * u.GeV, None), nHits=(9, None)),
+    # outputDirRoot=outputDir,
+    outputDirCsv=outputDir,
 )
 
 s.run()
