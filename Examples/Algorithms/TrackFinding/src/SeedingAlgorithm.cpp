@@ -91,7 +91,7 @@ ActsExamples::SeedingAlgorithm::SeedingAlgorithm(
     throw std::invalid_argument("Inconsistent config zBinNeighborsBottom");
   }
 
-  if (m_cfg.seedFinderConfig.zBinsCustomLooping.size() != 0) {
+  if (!m_cfg.seedFinderConfig.zBinsCustomLooping.empty()) {
     // check if zBinsCustomLooping contains numbers from 1 to the total number
     // of bin in zBinEdges
     for (size_t i = 1; i != m_cfg.gridConfig.zBinEdges.size(); i++) {
@@ -103,6 +103,38 @@ ActsExamples::SeedingAlgorithm::SeedingAlgorithm(
             "bins as zBinEdges");
       }
     }
+  }
+
+  if (m_cfg.seedFinderConfig.useDetailedDoubleMeasurementInfo) {
+    m_cfg.seedFinderConfig.getTopHalfStripLength.connect(
+        [](const void*, const SimSpacePoint& sp) -> float {
+          return sp.topHalfStripLength();
+        });
+
+    m_cfg.seedFinderConfig.getBottomHalfStripLength.connect(
+        [](const void*, const SimSpacePoint& sp) -> float {
+          return sp.bottomHalfStripLength();
+        });
+
+    m_cfg.seedFinderConfig.getTopStripDirection.connect(
+        [](const void*, const SimSpacePoint& sp) -> Acts::Vector3 {
+          return sp.topStripDirection();
+        });
+
+    m_cfg.seedFinderConfig.getBottomStripDirection.connect(
+        [](const void*, const SimSpacePoint& sp) -> Acts::Vector3 {
+          return sp.bottomStripDirection();
+        });
+
+    m_cfg.seedFinderConfig.getStripCenterDistance.connect(
+        [](const void*, const SimSpacePoint& sp) -> Acts::Vector3 {
+          return sp.stripCenterDistance();
+        });
+
+    m_cfg.seedFinderConfig.getTopStripCenterPosition.connect(
+        [](const void*, const SimSpacePoint& sp) -> Acts::Vector3 {
+          return sp.topStripCenterPosition();
+        });
   }
 
   m_cfg.seedFinderConfig.seedFilter =
@@ -131,7 +163,7 @@ ActsExamples::ProcessCode ActsExamples::SeedingAlgorithm::execute(
       // stable and we do not need to create local copies.
       spacePointPtrs.push_back(&spacePoint);
       // store x,y,z values in extent
-      rRangeSPExtent.check({spacePoint.x(), spacePoint.y(), spacePoint.z()});
+      rRangeSPExtent.extend({spacePoint.x(), spacePoint.y(), spacePoint.z()});
     }
   }
 

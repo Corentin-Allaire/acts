@@ -66,5 +66,12 @@ run \
     -p $outdir/truth_tracking_plots \
 
 
+run \
+    $outdir/acts_analysis_residuals_and_pulls.root \
+    $refdir/acts_analysis_residuals_and_pulls.root \
+    --title "analysis_residuals_and_pulls" \
+#    -o $outdir/analysis_residuals_and_pulls.html \
+#    -p $outdir/analysis_residuals_and_pulls \
+
 
 exit $ec
