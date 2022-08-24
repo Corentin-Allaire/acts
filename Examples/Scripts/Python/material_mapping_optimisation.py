@@ -6,6 +6,7 @@ import math
 from types import FunctionType
 
 from orion.client import build_experiment
+from orion.storage.base import get_storage
 
 from acts.examples import (
     Sequencer,
