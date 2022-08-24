@@ -31,7 +31,8 @@ from acts import (
     MaterialMapJsonConverter,
 )
 
-from common import getOpenDataDetector
+from common import getOpenDataDetectorDirectory
+from acts.examples.odd import getOpenDataDetector
 from datetime import datetime
 
 
