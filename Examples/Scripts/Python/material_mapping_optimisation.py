@@ -304,8 +304,8 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
     # x represent X or phi depending on the type of surface
     # y represent Y, R or Z depending on the type of surface
     space = {
-        "x": "uniform(1, 120, discrete=True)",
-        "y": "uniform(1, 120, discrete=True)",
+        "x": "uniform(1, 240, discrete=True)",
+        "y": "uniform(1, 240, discrete=True)",
     }
     # Build the experiment
     experiments = build_experiment(
@@ -313,29 +313,14 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
         version="1",
         space=space,
         algorithms="random",
-        # algorithms="tpe":{
-        #     "seed": null
-        #     "n_initial_points": 20
-        #     "n_ei_candidates": 25
-        #     "gamma": 0.25
-        #     "equal_weight": False
-        #     "prior_weight": 1.0
-        #     "full_weight_num": 25
-        #     "parallel_strategy":{
-        #         "of_type": StatusBasedParallelStrategy
-        #         "strategy_configs":{
-        #             "broken":{
-        #                 "of_type": MaxParallelStrategy
-        #             }
-        #         }
-        #         "default_strategy":{
-        #             "of_type": NoParallelStrategy
-        #         }
-        #     }
-        # },
         storage=storage,
         max_idle_time=2400,
     )
+    # Clean trial that haven't been completed
+    store = get_storage()
+    store.delete_trials(uid=experiments.id, where={"status": {"$ne": "completed"}})
+    store.release_algorithm_lock(uid=experiments.id)
+
     trials = dict()
     binMap = dict()
     # Suggest one binning per job and then send them via the pipe
@@ -410,9 +395,12 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
         best = df.iloc[df.objective.idxmin()]
         print(
             datetime.now().strftime("%H:%M:%S")
-            + "    Best score for surface " + str(key) + " : " + str(best),
+            + "    Best score for surface "
+            + str(key)
+            + " : "
+            + str(best),
             flush=True,
-        )        
+        )
         resultBinMap = (best.x, best.y)
         pipeBin.send(resultBinMap)
 
@@ -583,7 +571,7 @@ if "__main__" == __name__:
         )
 
         rMap.run()
-        del rMap   # Need to be deleted to write the material map to cbor
+        del rMap  # Need to be deleted to write the material map to cbor
         del resultDetector, resultTrackingGeometry, resultDecorators
     print(
         datetime.now().strftime("%H:%M:%S")
