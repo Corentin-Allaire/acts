@@ -44,6 +44,7 @@ def runMaterialMappingNoTrack(
     mapSurface=True,
     mapVolume=True,
     format=JsonFormat.Json,
+    readSurface=False,
     s=None,
 ):
     s = s or Sequencer(numThreads=1)
@@ -64,6 +65,7 @@ def runMaterialMappingNoTrack(
             level=acts.logging.INFO,
             collection="material-tracks",
             fileList=[os.path.join(inputDir, "geant4_material_tracks.root")],
+            readSurface=readSurface,
         )
     )
 
@@ -120,7 +122,9 @@ def runMaterialMappingNoTrack(
 # Run the material mapping and compute the variance for each bin of each surfaces
 # Return a dict with the GeometryId value of the surface as a key that stores
 # a list of pairs corresponding to the variance and number of tracks associated with each bin of the surface
-def runMaterialMappingVariance(binMap, events, job, inputPath, pathExp, pipeResult):
+def runMaterialMappingVariance(
+    binMap, events, job, inputPath, pathExp, pipeResult, readSurface=False
+):
     """
     Run the material mapping and compute the variance for each bin of each surfaces
     Return a dict with the GeometryId value of the surface as a key that stores
@@ -132,6 +136,7 @@ def runMaterialMappingVariance(binMap, events, job, inputPath, pathExp, pipeResu
     inputPath : Directory containing the input geantino track and the json geometry
     pathExp : Material mapping optimisation path
     pipeResult : Pipe to send back the score to the main python instance
+    readSurface : Are surface information stored in the material track. Switch to true if the mapping was already performed to improve the speed.
     """
     print(
         datetime.now().strftime("%H:%M:%S") + "    Start mapping for job " + str(job),
@@ -173,6 +178,7 @@ def runMaterialMappingVariance(binMap, events, job, inputPath, pathExp, pipeResu
         mapName=mapName,
         format=JsonFormat.Cbor,
         mapVolume=mapVolume,
+        readSurface=readSurface,
         s=sMap,
     )
 
@@ -208,6 +214,7 @@ def runMaterialMappingVariance(binMap, events, job, inputPath, pathExp, pipeResu
         level=acts.logging.ERROR,
         collection="material-tracks",
         fileList=[os.path.join(inputPath, "geant4_material_tracks.root")],
+        readSurface=readSurface,
     )
     s.addReader(reader)
 
@@ -425,7 +432,11 @@ if "__main__" == __name__:
     parser.add_argument(
         "--doPloting", action="store_true"
     )  # Return the optimisation plot and create the optimal material map
+    parser.add_argument(
+        "--readSurface", action="store_true"
+    )  # Return the optimisation plot and create the optimal material map
     parser.set_defaults(doPloting=False)
+    parser.set_defaults(readSurface=False)
     args = parser.parse_args()
 
     # Define the useful path and create them if they do not exist
@@ -509,6 +520,7 @@ if "__main__" == __name__:
                 args.inputPath,
                 pathExp,
                 resultPipes_child[job],
+                args.readSurface,
             ),
         )
         OptiJob[job].start()
@@ -567,6 +579,7 @@ if "__main__" == __name__:
             mapName="optimised-material-map",
             format=JsonFormat.Json,
             mapVolume=False,
+            readSurface=args.readSurface,
             s=rMap,
         )
 
