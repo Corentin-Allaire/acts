@@ -237,8 +237,8 @@ ActsExamples::ProcessCode ActsExamples::RootMaterialTrackWriter::writeT(
         m_sur_z.push_back(mint.intersection.z());
         if (surface != nullptr) {
           m_sur_id.push_back(slayerID.value());
-          m_sur_type.push_back(surface->type())
-              const Acts::SurfaceBounds& surfaceBounds = surface->bounds();
+          m_sur_type.push_back(surface->type());
+          const Acts::SurfaceBounds& surfaceBounds = surface->bounds();
           const Acts::RadialBounds* radialBounds =
               dynamic_cast<const Acts::RadialBounds*>(&surfaceBounds);
           const Acts::CylinderBounds* cylinderBounds =
