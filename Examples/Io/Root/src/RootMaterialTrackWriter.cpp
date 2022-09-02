@@ -147,6 +147,7 @@ ActsExamples::ProcessCode ActsExamples::RootMaterialTrackWriter::writeT(
     m_sur_x.clear();
     m_sur_y.clear();
     m_sur_z.clear();
+    m_sur_pathCorrection.clear();
     m_sur_range_min.clear();
     m_sur_range_max.clear();
 
@@ -178,6 +179,7 @@ ActsExamples::ProcessCode ActsExamples::RootMaterialTrackWriter::writeT(
     m_sur_x.reserve(mints);
     m_sur_y.reserve(mints);
     m_sur_z.reserve(mints);
+    m_sur_pathCorrection.reserve(mints);
     m_sur_range_min.reserve(mints);
     m_sur_range_max.reserve(mints);
 
