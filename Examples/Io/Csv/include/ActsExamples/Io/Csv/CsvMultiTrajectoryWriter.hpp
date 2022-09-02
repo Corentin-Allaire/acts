@@ -73,6 +73,7 @@ class CsvMultiTrajectoryWriter : public WriterT<TrajectoriesContainer> {
     std::string trackType;
     double truthMatchProb;
     const TrackParameters* fittedParameters;
+    std::vector<uint64_t> measurementsID;
   };  // trackInfo struct
 };
 
