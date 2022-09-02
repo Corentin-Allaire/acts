@@ -66,7 +66,7 @@ def runMaterialMappingNoTrack(
         RootMaterialTrackReader(
             level=acts.logging.INFO,
             collection="material-tracks",
-            fileList=[os.path.join(inputDir, "geant4_material_tracks.root")],
+            fileList=[os.path.join(inputDir, "optimised-material-map_tracks.root" if readSurface else "geant4_material_tracks.root")],
             readSurface=readSurface,
         )
     )
@@ -221,7 +221,7 @@ def runMaterialMappingVariance(
     reader = RootMaterialTrackReader(
         level=acts.logging.ERROR,
         collection="material-tracks",
-        fileList=[os.path.join(inputPath, "geant4_material_tracks.root")],
+        fileList=[os.path.join(inputDir, "optimised-material-map_tracks.root" if readSurface else "geant4_material_tracks.root")],
         readSurface=readSurface,
     )
     s.addReader(reader)
@@ -312,7 +312,7 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
             "name": "database_" + str(key),
             "type": "pickleddb",
             "host": os.path.join(pathDB, "database_" + str(key) + ".pkl"),
-            "timeout": 2400,
+            "timeout": 43200,
         },
     }
     # Create the search space, the range of the binning can be chosen here
@@ -329,7 +329,7 @@ def surfaceExperiment(key, nbJobs, pathDB, pathResult, pipeBin, pipeResult, doPl
         space=space,
         algorithms="random",
         storage=storage,
-        max_idle_time=2400,
+        max_idle_time=43200,
     )
     # Clean trial that haven't been completed
     store = get_storage()
@@ -589,7 +589,6 @@ if "__main__" == __name__:
             mapName="optimised-material-map",
             format=JsonFormat.Json,
             mapVolume=False,
-            readSurface=args.readSurface,
             s=rMap,
         )
 

@@ -42,9 +42,9 @@ from acts.examples.reconstruction import (
     VertexFinder,
 )
 
-s = acts.examples.Sequencer(events=1000, numThreads=2, logLevel=acts.logging.INFO)
+s = acts.examples.Sequencer(events=100, numThreads=2, logLevel=acts.logging.INFO)
 
-evGen = addPythia8(s, rnd, hardProcess = ["Top:qqbar2ttbar=on"], npileup=200)
+evGen = addPythia8(s, rnd, hardProcess = ["Top:qqbar2ttbar=on"], npileup=0)
 
 s.addAlgorithm(
     acts.examples.ParticleSelector(
@@ -89,6 +89,15 @@ s.addWriter(
         inputSimHits="simhits",
         outputDir=str(outputDir),
         outputStem="hits",
+    )
+)
+
+s.addWriter(
+    acts.examples.CsvMultiTrajectoryWriter(
+        level=acts.logging.INFO,
+        inputTrajectories="trajectories",
+        inputMeasurementParticlesMap="measurement_particles_map",
+        outputDir=str(outputDir),
     )
 )
 

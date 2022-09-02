@@ -122,6 +122,16 @@ ProcessCode CsvMultiTrajectoryWriter::writeT(
       toAdd.fittedParameters = &traj.trackParameters(trackTip);
       toAdd.trackType = "unknown";
 
+      mj.visitBackwards(trackTip, [&](const auto& state) {
+        if (state.typeFlags().test(Acts::TrackStateFlag::MeasurementFlag) ==
+            true) {
+          const auto& sl =
+              static_cast<const IndexSourceLink&>(state.uncalibrated());
+          auto hitIndex = sl.index();
+          toAdd.measurementsID.insert(toAdd.measurementsID.begin(), hitIndex);
+        }
+      });
+
       // Check if the trajectory is matched with truth.
       if (toAdd.truthMatchProb >= m_cfg.truthMatchProbMin) {
         matched[toAdd.particleId].push_back({toAdd, toAdd.trackId});
@@ -160,7 +170,8 @@ ProcessCode CsvMultiTrajectoryWriter::writeT(
       << "chi2,ndf,chi2/ndf,"
       << "pT,eta,phi,"
       << "truthMatchProbability,"
-      << "good/duplicate/fake";
+      << "good/duplicate/fake,"
+      << "Hits_ID";
 
   mos << '\n';
   mos << std::setprecision(m_cfg.outputPrecision);
@@ -192,7 +203,12 @@ ProcessCode CsvMultiTrajectoryWriter::writeT(
     mos << Acts::VectorHelpers::phi(trajState.fittedParameters->momentum())
         << ",";
     mos << trajState.truthMatchProb << ",";
-    mos << trajState.trackType;
+    mos << trajState.trackType << ",";
+    mos << "\"[";
+    for (auto& ID : trajState.measurementsID) {
+      mos << ID << ",";
+    }
+    mos << "]\"";
     mos << '\n';
   }
 

@@ -271,7 +271,7 @@ void Acts::SurfaceMaterialMapper::mapMaterialTrack(
   GeometryIdentifier lastID = GeometryIdentifier();
   GeometryIdentifier currentID = GeometryIdentifier();
   Vector3 currentPos(0., 0., 0);
-  float currentPathCorrection = 0.;
+  float currentPathCorrection = 1.;
   auto currentAccMaterial = mState.accumulatedMaterial.end();
 
   // To remember the bins of this event
@@ -468,7 +468,7 @@ void Acts::SurfaceMaterialMapper::mapSurfaceInteraction(
 
     // Now assign the material for the accumulation process
     auto tBin = currentAccMaterial->second.accumulate(
-        currentPos, rmIter->materialSlab, 1.0);
+        currentPos, rmIter->materialSlab, rmIter->pathCorrection);
     if (!touchedMapBins.count(&(currentAccMaterial->second))) {
       touchedMapBins.insert(MapBin(&(currentAccMaterial->second), tBin));
     }

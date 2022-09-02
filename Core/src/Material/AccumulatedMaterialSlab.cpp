@@ -22,15 +22,15 @@ void Acts::AccumulatedMaterialSlab::trackVariance(MaterialSlab slabReference,
                                                   bool useEmptyTrack) {
   // Only use real tracks or if empty tracks are allowed.
   if (useEmptyTrack or (0 < m_trackAverage.thickness())) {
-    float variance = ((1 / m_trackAverage.material().X0()) -
-                      (1 / slabReference.material().X0())) *
-                     ((1 / m_trackAverage.material().X0()) -
-                      (1 / slabReference.material().X0()));
+    double variance = ((1.0 / m_trackAverage.material().X0()) -
+                       (1.0 / slabReference.material().X0())) *
+                      ((1.0 / m_trackAverage.material().X0()) -
+                       (1.0 / slabReference.material().X0()));
     if (m_totalCount == 0u) {
       m_totalVariance = variance;
     } else {
       double weightTotal = m_totalCount / (m_totalCount + 1.0);
-      double weightTrack = 1 / (m_totalCount + 1.0);
+      double weightTrack = 1.0 / (m_totalCount + 1.0);
       m_totalVariance = weightTotal * m_totalVariance + weightTrack * variance;
     }
   }
@@ -43,7 +43,7 @@ void Acts::AccumulatedMaterialSlab::trackAverage(bool useEmptyTrack) {
       m_totalAverage = m_trackAverage;
     } else {
       double weightTotal = m_totalCount / (m_totalCount + 1.0);
-      double weightTrack = 1 / (m_totalCount + 1.0);
+      double weightTrack = 1.0 / (m_totalCount + 1.0);
       // average such that each track contributes equally.
       MaterialSlab fromTotal(m_totalAverage.material(),
                              weightTotal * m_totalAverage.thickness());
@@ -62,7 +62,7 @@ Acts::AccumulatedMaterialSlab::totalAverage() const {
   return {m_totalAverage, m_totalCount};
 }
 
-std::pair<float, unsigned int> Acts::AccumulatedMaterialSlab::totalVariance()
+std::pair<double, unsigned int> Acts::AccumulatedMaterialSlab::totalVariance()
     const {
   return {m_totalVariance, m_totalCount};
 }

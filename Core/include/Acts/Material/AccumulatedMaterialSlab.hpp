@@ -89,7 +89,7 @@ class AccumulatedMaterialSlab {
   /// If there have been additional calls to `.accumulate(...)` afterwards, the
   /// information is not part of the total average. The number of tracks is only
   /// opdated on the call of `.trackAverage(...)`
-  std::pair<float, unsigned int> totalVariance() const;
+  std::pair<double, unsigned int> totalVariance() const;
 
  private:
   /// Averaged properties for a single track.
@@ -97,7 +97,7 @@ class AccumulatedMaterialSlab {
   /// Averaged properties over multiple tracks.
   MaterialSlab m_totalAverage;
   /// Averaged variance over multiple tracks.
-  float m_totalVariance = 0.0;
+  double m_totalVariance = 0.0;
   // Number of tracks contributing to the total average.
   unsigned int m_totalCount = 0u;
 };
