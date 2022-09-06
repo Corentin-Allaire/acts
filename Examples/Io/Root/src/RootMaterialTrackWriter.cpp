@@ -238,16 +238,20 @@ ActsExamples::ProcessCode ActsExamples::RootMaterialTrackWriter::writeT(
           m_sur_x.push_back(mint.intersection.x());
           m_sur_y.push_back(mint.intersection.y());
           m_sur_z.push_back(mint.intersection.z());
+        } else if (surface != nullptr) {
+          auto sfIntersection = surface->intersect(
+              ctx.geoContext, mint.position, mint.direction, true);
+          m_sur_id.push_back(surface->geometryId().value());
+          m_sur_pathCorrection.push_back(1.0);
+          m_sur_x.push_back(sfIntersection.intersection.position.x());
+          m_sur_y.push_back(sfIntersection.intersection.position.y());
+          m_sur_z.push_back(sfIntersection.intersection.position.z());
         } else {
-          if (surface != nullptr) {
-            auto sfIntersection = surface->intersect(
-                ctx.geoContext, mint.position, mint.direction, true);
-            m_sur_id.push_back(surface->geometryId().value());
-            m_sur_pathCorrection.push_back(1.0);
-            m_sur_x.push_back(sfIntersection.intersection.position.x());
-            m_sur_y.push_back(sfIntersection.intersection.position.y());
-            m_sur_z.push_back(sfIntersection.intersection.position.z());
-          }
+          m_sur_id.push_back(Acts::GeometryIdentifier().value());
+          m_sur_x.push_back(0);
+          m_sur_y.push_back(0);
+          m_sur_z.push_back(0);
+          m_sur_pathCorrection.push_back(1.0);
         }
         if (surface != nullptr) {
           m_sur_type.push_back(surface->type());
@@ -270,13 +274,8 @@ ActsExamples::ProcessCode ActsExamples::RootMaterialTrackWriter::writeT(
             m_sur_range_max.push_back(0);
           }
         } else {
-          m_sur_id.push_back(Acts::GeometryIdentifier().value());
           m_sur_type.push_back(-1);
-          m_sur_pathCorrection.push_back(1.0);
 
-          m_sur_x.push_back(0);
-          m_sur_y.push_back(0);
-          m_sur_z.push_back(0);
           m_sur_range_min.push_back(0);
           m_sur_range_max.push_back(0);
         }
