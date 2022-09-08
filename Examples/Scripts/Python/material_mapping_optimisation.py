@@ -66,7 +66,14 @@ def runMaterialMappingNoTrack(
         RootMaterialTrackReader(
             level=acts.logging.INFO,
             collection="material-tracks",
-            fileList=[os.path.join(inputDir, "optimised-material-map_tracks.root" if readSurface else "geant4_material_tracks.root")],
+            fileList=[
+                os.path.join(
+                    inputDir,
+                    "optimised-material-map_tracks.root"
+                    if readSurface
+                    else "geant4_material_tracks.root",
+                )
+            ],
             readSurface=readSurface,
         )
     )
@@ -221,7 +228,14 @@ def runMaterialMappingVariance(
     reader = RootMaterialTrackReader(
         level=acts.logging.ERROR,
         collection="material-tracks",
-        fileList=[os.path.join(inputDir, "optimised-material-map_tracks.root" if readSurface else "geant4_material_tracks.root")],
+        fileList=[
+            os.path.join(
+                inputDir,
+                "optimised-material-map_tracks.root"
+                if readSurface
+                else "geant4_material_tracks.root",
+            )
+        ],
         readSurface=readSurface,
     )
     s.addReader(reader)
@@ -589,6 +603,7 @@ if "__main__" == __name__:
             mapName="optimised-material-map",
             format=JsonFormat.Json,
             mapVolume=False,
+            readSurface=args.readSurface,
             s=rMap,
         )
 
