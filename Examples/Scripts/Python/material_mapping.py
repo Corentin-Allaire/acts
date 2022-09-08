@@ -37,6 +37,7 @@ def runMaterialMapping(
     mapSurface=True,
     mapVolume=True,
     format=JsonFormat.Json,
+    readSurface=False,
     s=None,
 ):
     s = s or Sequencer(numThreads=1)
@@ -56,6 +57,14 @@ def runMaterialMapping(
         RootMaterialTrackReader(
             level=acts.logging.INFO,
             collection="material-tracks",
+            fileList=[
+                os.path.join(
+                    inputDir,
+                    "optimised-material-map_tracks.root"
+                    if readSurface
+                    else "geant4_material_tracks.root",
+                )
+            ],
             readSurface=readSurface,
         )
     )
@@ -130,5 +139,9 @@ if "__main__" == __name__:
     )
 
     runMaterialMapping(
-        trackingGeometry, decorators, outputDir=os.getcwd(), inputDir=os.getcwd()
+        trackingGeometry,
+        decorators,
+        outputDir=os.getcwd(),
+        inputDir=os.getcwd(),
+        readSurface=False,
     ).run()
