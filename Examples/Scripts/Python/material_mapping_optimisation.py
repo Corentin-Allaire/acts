@@ -230,7 +230,7 @@ def runMaterialMappingVariance(
         collection="material-tracks",
         fileList=[
             os.path.join(
-                inputDir,
+                inputPath,
                 "optimised-material-map_tracks.root"
                 if readSurface
                 else "geant4_material_tracks.root",
@@ -283,9 +283,10 @@ def runMaterialMappingVariance(
         nonZero = 0
         binParameters = mapping.scoringParameters(key)
         # Objective : Sum of variance in all bin divided by the number of bin
+        # The variance is scaled by (1.0 + 1.0/(number of hits in the bin)) to encourage larger bin at equal score        
         for parameters in binParameters:
             if parameters[1] != 0:
-                objective += parameters[0]
+                objective += parameters[0] * (1.0 + 1.0 / parameters[1])
                 nonZero += 1
         if nonZero != 0:
             objective = objective / nonZero

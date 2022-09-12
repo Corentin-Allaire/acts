@@ -44,7 +44,7 @@ from acts.examples.reconstruction import (
 
 s = acts.examples.Sequencer(events=100, numThreads=2, logLevel=acts.logging.INFO)
 
-evGen = addPythia8(s, rnd, hardProcess = ["Top:qqbar2ttbar=on"], npileup=0)
+evGen = addPythia8(s, rnd, hardProcess = ["Top:qqbar2ttbar=on"], npileup=200)
 
 s.addAlgorithm(
     acts.examples.ParticleSelector(
