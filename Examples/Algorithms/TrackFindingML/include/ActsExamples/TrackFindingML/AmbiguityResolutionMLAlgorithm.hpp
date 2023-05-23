@@ -35,7 +35,7 @@ class AmbiguityResolutionMLAlgorithm final : public AmbiguityResolutionML {
     /// Minumum number of measurement to form a track.
     int nMeasurementsMin = 7;
     /// Minumum number of shared hits to consider two tracks as duplicates.
-    int nSharedHitsMin = 2;
+    int maximumSharedHits = 2;
   };
 
   /// Construct the ambiguity resolution algorithm.

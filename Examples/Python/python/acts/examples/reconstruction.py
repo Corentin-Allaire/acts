@@ -141,14 +141,14 @@ AmbiguityResolutionConfig = namedtuple(
 
 AmbiguityResolutionMLConfig = namedtuple(
     "AmbiguityResolutionMLConfig",
-    ["nMeasurementsMin"],
-    defaults=[None] * 1,
+    ["maximumSharedHits", "nMeasurementsMin"],
+    defaults=[None] * 2,
 )
 
 AmbiguityResolutionMLDBScanConfig = namedtuple(
     "AmbiguityResolutionMLDBScanConfig",
-    ["nMeasurementsMin", "epsilonDBScan", "minPointsDBScan"],
-    defaults=[None] * 3,
+    ["maximumSharedHits", "nMeasurementsMin", "epsilonDBScan", "minPointsDBScan"],
+    defaults=[None] * 4,
 )
 
 
@@ -1333,6 +1333,7 @@ def addAmbiguityResolutionML(
         inputDuplicateNN=onnxModelFile,
         outputTracks="filteredTrajectoriesML",
         **acts.examples.defaultKWArgs(
+            maximumSharedHits=config.maximumSharedHits,
             nMeasurementsMin=config.nMeasurementsMin,
         ),
     )
@@ -1378,7 +1379,7 @@ def addAmbiguityResolutionMLDBScan(
     writeTrajectories: bool = True,
     logLevel: Optional[acts.logging.Level] = None,
 ) -> None:
-    from acts.examples import AmbiguityResolutionMLDBScanAlgorithm
+    from acts.examples.onnx.mlpack import AmbiguityResolutionMLDBScanAlgorithm
 
     customLogLevel = acts.examples.defaultLogging(s, logLevel)
 
@@ -1388,6 +1389,7 @@ def addAmbiguityResolutionMLDBScan(
         inputDuplicateNN=onnxModelFile,
         outputTracks="filteredTrajectoriesMLDBScan",
         **acts.examples.defaultKWArgs(
+            maximumSharedHits=config.maximumSharedHits,
             nMeasurementsMin=config.nMeasurementsMin,
             epsilonDBScan=config.epsilonDBScan,
             minPointsDBScan=config.minPointsDBScan,

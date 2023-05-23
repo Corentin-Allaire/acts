@@ -33,6 +33,12 @@ CKF_files_track = sorted(
 CKF_files_resolved = sorted(
     glob.glob("odd_output" + "/event0000000[0-9][0-9]-tracks_ambiML.csv")
 )
+# CKF_files_resolved = sorted(
+#    glob.glob("odd_output" + "/event0000000[0-9][0-9]-tracks_ambi.csv")
+# )
+# CKF_files_resolved = sorted(
+#    glob.glob("odd_output" + "/event0000000[0-9][0-9]-tracks_ambiMLDBScan.csv")
+# )
 
 data_track = readDataSet(CKF_files_track)
 data_resolved = readDataSet(CKF_files_resolved)

@@ -26,6 +26,7 @@ void addOnnxMlpack(Context& ctx) {
   ACTS_PYTHON_DECLARE_ALGORITHM(
       ActsExamples::AmbiguityResolutionMLDBScanAlgorithm, mlpack,
       "AmbiguityResolutionMLDBScanAlgorithm", inputTracks, inputDuplicateNN,
-      outputTracks, nMeasurementsMin, epsilonDBScan, minPointsDBScan);
+      outputTracks, maximumSharedHits, nMeasurementsMin, epsilonDBScan,
+      minPointsDBScan);
 }
 }  // namespace Acts::Python

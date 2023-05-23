@@ -38,7 +38,7 @@ ActsExamples::ProcessCode ActsExamples::AmbiguityResolutionMLAlgorithm::execute(
   std::multimap<int, std::pair<int, std::vector<int>>> trackMap =
       mapTrackHits(tracks, m_cfg.nMeasurementsMin);
   auto cluster =
-      Acts::detail::clusterDuplicateTracks(trackMap, m_cfg.nSharedHitsMin);
+      Acts::detail::clusterDuplicateTracks(trackMap, m_cfg.maximumSharedHits);
   // Select the ID of the track we want to keep
   std::vector<int> goodTracks =
       m_duplicateClassifier.solveAmbuguity(cluster, tracks);

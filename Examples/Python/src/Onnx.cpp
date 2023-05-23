@@ -27,6 +27,6 @@ void addOnnx(Context& ctx) {
   ACTS_PYTHON_DECLARE_ALGORITHM(ActsExamples::AmbiguityResolutionMLAlgorithm,
                                 onnx, "AmbiguityResolutionMLAlgorithm",
                                 inputTracks, inputDuplicateNN, outputTracks,
-                                nMeasurementsMin);
+                                maximumSharedHits, nMeasurementsMin);
 }
 }  // namespace Acts::Python

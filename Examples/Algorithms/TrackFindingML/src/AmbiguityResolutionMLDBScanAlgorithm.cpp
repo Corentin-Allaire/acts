@@ -43,7 +43,7 @@ ActsExamples::AmbiguityResolutionMLDBScanAlgorithm::execute(
       mapTrackHits(tracks, m_cfg.nMeasurementsMin);
   // Cluster the tracks using DBscan
   auto cluster =
-      Acts::dbscanTrackClustering(trackMap, tracks, m_cfg.nSharedHitsMin,
+      Acts::dbscanTrackClustering(trackMap, tracks, m_cfg.maximumSharedHits,
                                   m_cfg.epsilonDBScan, m_cfg.minPointsDBScan);
   // Select the ID of the track we want to keep
   std::vector<int> goodTracks =

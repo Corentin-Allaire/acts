@@ -37,7 +37,7 @@ class AmbiguityResolutionMLDBScanAlgorithm final
     /// Minumum number of measurement to form a track.
     int nMeasurementsMin = 7;
     /// Minumum number of shared hits to consider two tracks as duplicates.
-    int nSharedHitsMin = 1;
+    int maximumSharedHits = 1;
     /// Maximum distance between 2 tracks to be clustered in the DBScan
     float epsilonDBScan = 0.07;
     /// Minimum number of tracks to create a cluster in the DBScan
