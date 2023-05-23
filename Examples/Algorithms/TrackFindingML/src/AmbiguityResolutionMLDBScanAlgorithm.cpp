@@ -42,8 +42,9 @@ ActsExamples::AmbiguityResolutionMLDBScanAlgorithm::execute(
   std::multimap<int, std::pair<int, std::vector<int>>> trackMap =
       mapTrackHits(tracks, m_cfg.nMeasurementsMin);
   // Cluster the tracks using DBscan
-  auto cluster = Acts::dbscanTrackClustering(
-      trackMap, tracks, m_cfg.epsilonDBScan, m_cfg.minPointsDBScan);
+  auto cluster =
+      Acts::dbscanTrackClustering(trackMap, tracks, m_cfg.nSharedHitsMin,
+                                  m_cfg.epsilonDBScan, m_cfg.minPointsDBScan);
   // Select the ID of the track we want to keep
   std::vector<int> goodTracks =
       m_duplicateClassifier.solveAmbuguity(cluster, tracks);
