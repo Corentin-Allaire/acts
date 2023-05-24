@@ -16,18 +16,18 @@ std::unordered_map<int, std::vector<int>> Acts::detail::clusterDuplicateTracks(
   std::unordered_map<int, std::vector<int>> cluster;
   // Unordered map associating hits to the ID of the first track of the
   // different clusters.
-  std::map<int, int> hitToTrack;
+  std::unordered_map<int, int> hitToTrack;
+
+  // Unordered map associating number of matched hits to the ID of the cluster
+  std::map<int, int> nbMatchedToCluster;
 
   // Loop over all the tracks
   for (const auto& track : trackMap) {
-    std::vector<int> hits = track.second.second;
-    // Unordered map associating number of matched hits to the ID of the
-    // cluster
-    std::map<int, int> nbMatchedToCluster;
+    nbMatchedToCluster.clear();
     auto matchedTrack = hitToTrack.end();
     auto mCluster = nbMatchedToCluster.end();
     // Loop over all the hits in the track
-    for (const auto& hit : hits) {
+    for (const auto& hit : track.second.second) {
       // Check if the hit is already associated to a track
       matchedTrack = hitToTrack.find(hit);
       if (matchedTrack != hitToTrack.end()) {
@@ -60,7 +60,7 @@ std::unordered_map<int, std::vector<int>> Acts::detail::clusterDuplicateTracks(
     else {
       cluster.emplace(track.second.first,
                       std::vector<int>(1, track.second.first));
-      for (const auto& hit : hits) {
+      for (const auto& hit : track.second.second) {
         // Add the hits of the new cluster to the hitToTrack
         hitToTrack.emplace(hit, track.second.first);
       }
