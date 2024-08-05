@@ -17,6 +17,8 @@ from embedding_network import (
 import sys
 from typing import Tuple
 import argparse
+import os
+import math
 
 
 def init_seed(size: int, device_acc: str) -> Tensor:
@@ -359,7 +361,10 @@ def prepare_input_tensor(
 
 
 def read_data(
-    file_hits: str, file_particles: str, vertex_cuts: list = [10, 10, 200]
+    file_hits: str,
+    file_particles: str,
+    start_event: int = 0,
+    vertex_cuts: list = [10, 10, 200],
 ) -> Tuple[pd.DataFrame, pd.DataFrame, int]:
     """
     Read the hits and particles csv files and return the DataFrames and the number of events in the dataset dataset after cuts
@@ -384,8 +389,10 @@ def read_data(
     # Modify the value of events so it is continuous again
     events = particles["event_id"].unique()
     for i in range(len(events)):
-        particles["event_id"] = particles["event_id"].replace(events[i], i)
-        hits["event_id"] = hits["event_id"].replace(events[i], i)
+        particles["event_id"] = particles["event_id"].replace(
+            events[i], start_event + i
+        )
+        hits["event_id"] = hits["event_id"].replace(events[i], start_event + i)
 
     nb_events = len(hits["event_id"].unique())
     return hits, particles, nb_events
@@ -672,6 +679,17 @@ def main():
         "train/hits.csv", "train/particles.csv", cfg.vertex_cuts
     )
 
+    # hits_train = pd.DataFrame()
+    # particles_train = pd.DataFrame()
+    # val_fraction = 0.1
+    # dir_path = "ODD_data_mu"
+    # nb_files = len([name for name in os.listdir(dir_path) if os.path.isdir(os.path.join(dir_path, name))])
+    # nb_events = 0
+    # for i in range(math.floor(nb_files*(1-val_fraction))):
+    #     hits, particles, nb_events = read_data("train/odd_full_chain_" + str(i) + "/hits.csv", "train/odd_full_chain_" + str(i) + "/particles.csv", nb_events, cfg.vertex_cuts)
+    #     hits_train = pd.concat([hits_train, hits])
+    #     particles_train = pd.concat([particles_train, particles])
+
     if cfg.embedding == "ID":
         embedding_encoder = EmbeddingGeoID(
             emb_size=512,
@@ -751,6 +769,20 @@ def main():
     hits_val, particles_val, nb_events = read_data(
         "val/hits.csv", "val/particles.csv", cfg.vertex_cuts
     )
+
+    # hits_train = pd.DataFrame()
+    # particles_train = pd.DataFrame()
+    # nb_events = 0
+    # for i in range(math.floor(nb_files * (1 - val_fraction)), nb_files):
+    #     hits, particles, nb_events = read_data(
+    #         "train/odd_full_chain_" + str(i) + "/hits.csv",
+    #         "train/odd_full_chain_" + str(i) + "/particles.csv",
+    #         nb_events,
+    #         cfg.vertex_cuts,
+    #     )
+    #     hits_train = pd.concat([hits_train, hits])
+    #     particles_train = pd.concat([particles_train, particles])
+
     model.eval()
     _, metrics_val = run_model(cfg, hits_val, particles_val, nb_events, model)
 
