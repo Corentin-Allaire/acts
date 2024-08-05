@@ -78,6 +78,7 @@ struct GsfFitterFunctionImpl final : public ActsExamples::TrackFitterFunction {
 
   std::size_t maxComponents = 0;
   double weightCutoff = 0;
+  const double momentumCutoff = 0;  // 500_MeV;
   bool abortOnError = false;
   bool disableAllMaterialHandling = false;
   MixtureReductionAlgorithm reductionAlg =
@@ -102,23 +103,28 @@ struct GsfFitterFunctionImpl final : public ActsExamples::TrackFitterFunction {
         &updater);
 
     Acts::GsfOptions<Acts::VectorMultiTrajectory> gsfOptions{
-        options.geoContext,
-        options.magFieldContext,
-        options.calibrationContext,
-        extensions,
-        options.propOptions,
-        &(*options.referenceSurface),
-        maxComponents,
-        weightCutoff,
-        abortOnError,
-        disableAllMaterialHandling};
+        options.geoContext, options.magFieldContext,
+        options.calibrationContext};
+    gsfOptions.extensions = extensions;
+    gsfOptions.propagatorPlainOptions = options.propOptions;
+    gsfOptions.referenceSurface = options.referenceSurface;
+    gsfOptions.maxComponents = maxComponents;
+    gsfOptions.weightCutoff = weightCutoff;
+    gsfOptions.abortOnError = abortOnError;
+    gsfOptions.disableAllMaterialHandling = disableAllMaterialHandling;
     gsfOptions.componentMergeMethod = mergeMethod;
 
     gsfOptions.extensions.calibrator.connect<&calibrator_t::calibrate>(
         &calibrator);
-    gsfOptions.extensions.surfaceAccessor
-        .connect<&IndexSourceLink::SurfaceAccessor::operator()>(
-            &m_slSurfaceAccessor);
+
+    if (options.doRefit) {
+      gsfOptions.extensions.surfaceAccessor
+          .connect<&RefittingCalibrator::accessSurface>();
+    } else {
+      gsfOptions.extensions.surfaceAccessor
+          .connect<&IndexSourceLink::SurfaceAccessor::operator()>(
+              &m_slSurfaceAccessor);
+    }
     switch (reductionAlg) {
       case MixtureReductionAlgorithm::weightCut: {
         gsfOptions.extensions.mixtureReducer
@@ -144,6 +150,14 @@ struct GsfFitterFunctionImpl final : public ActsExamples::TrackFitterFunction {
     if (!tracks.hasColumn(Acts::hashString(kFinalMultiComponentStateColumn))) {
       std::string key(kFinalMultiComponentStateColumn);
       tracks.template addColumn<FinalMultiComponentState>(key);
+    }
+
+    if (!tracks.hasColumn(Acts::hashString(kFwdMaxMaterialXOverX0))) {
+      tracks.template addColumn<double>(std::string(kFwdMaxMaterialXOverX0));
+    }
+
+    if (!tracks.hasColumn(Acts::hashString(kFwdSumMaterialXOverX0))) {
+      tracks.template addColumn<double>(std::string(kFwdSumMaterialXOverX0));
     }
 
     return fitter.fit(sourceLinks.begin(), sourceLinks.end(), initialParameters,

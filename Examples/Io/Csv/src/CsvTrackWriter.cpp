@@ -10,11 +10,16 @@
 
 #include "Acts/Definitions/Algebra.hpp"
 #include "Acts/EventData/MultiTrajectory.hpp"
+<<<<<<< HEAD
 #include "Acts/EventData/TrackContainer.hpp"
 #include "Acts/EventData/TrackProxy.hpp"
+=======
+#include "Acts/EventData/ProxyAccessor.hpp"
+>>>>>>> upstream/main
 #include "Acts/EventData/VectorMultiTrajectory.hpp"
 #include "Acts/Utilities/Helpers.hpp"
 #include "Acts/Utilities/MultiIndex.hpp"
+#include "ActsExamples/EventData/IndexSourceLink.hpp"
 #include "ActsExamples/EventData/Track.hpp"
 #include "ActsExamples/Framework/AlgorithmContext.hpp"
 #include "ActsExamples/Utilities/Paths.hpp"
@@ -111,16 +116,26 @@ ProcessCode CsvTrackWriter::writeT(const AlgorithmContext& context,
       nMajorityHits = particleHitCount.front().hitCount;
     }
 
+<<<<<<< HEAD
     static const Acts::ConstTrackAccessor<unsigned int> seedNumber(
+=======
+    static const Acts::ConstProxyAccessor<unsigned int> seedNumber(
+>>>>>>> upstream/main
         "trackGroup");
 
     // track info
     TrackInfo toAdd;
     toAdd.trackId = trackId;
     if (tracks.hasColumn(Acts::hashString("trackGroup"))) {
+<<<<<<< HEAD
       toAdd.seedId = seedNumber(track) - 1;
     } else {
       toAdd.seedId = 0;
+=======
+      toAdd.seedID = seedNumber(track);
+    } else {
+      toAdd.seedID = 0;
+>>>>>>> upstream/main
     }
     toAdd.particleId = majorityParticleId;
     toAdd.nStates = track.nTrackStates();
@@ -201,7 +216,11 @@ ProcessCode CsvTrackWriter::writeT(const AlgorithmContext& context,
 
     // write the track info
     mos << trajState.trackId << ",";
+<<<<<<< HEAD
     mos << trajState.seedId << ",";
+=======
+    mos << trajState.seedID << ",";
+>>>>>>> upstream/main
     mos << trajState.particleId << ",";
     mos << trajState.nStates << ",";
     mos << trajState.nMajorityHits << ",";

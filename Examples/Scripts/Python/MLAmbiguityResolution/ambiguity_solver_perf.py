@@ -1,6 +1,4 @@
 import glob
-import os
-import math
 
 import pandas as pd
 import numpy as np
@@ -14,7 +12,6 @@ def readDataSet(CKS_files: list[str]) -> pd.DataFrame:
     @param[in] CKS_files: DataFrame contain the data from each track files (1 file per events usually)
     @return: combined DataFrame containing all the track, ordered by events and then by truth particle ID in each event 
     """
-    globalindex = 0
     data = []
     for f in CKS_files:
         datafile = pd.read_csv(f)
@@ -33,11 +30,16 @@ CKF_files_track = sorted(
 CKF_files_resolved = sorted(
     glob.glob("odd_output" + "/event0000000[0-9][0-9]-tracks_ambi.csv")
 )
+<<<<<<< HEAD
 # ML_files_resolved = sorted(
 #     glob.glob("odd_output" + "/event0000000[0-9][0-9]-tracks_ambiML.csv")
 # )
 ML_files_resolved = sorted(
     glob.glob("odd_output_seedML" + "/event0000000[0-9][0-9]-tracks_ambi.csv")
+=======
+ML_files_resolved = sorted(
+    glob.glob("odd_output" + "/event0000000[0-9][0-9]-tracks_ambiML.csv")
+>>>>>>> upstream/main
 )
 
 data_track = readDataSet(CKF_files_track)
@@ -105,7 +107,11 @@ for trackEvent, resolvedEvent in zip(data_track, data_resolved):
     ].index.nunique()
     nb_reco_track += resolvedEvent.shape[0]
 
+<<<<<<< HEAD
 # Compute the different efficiencies
+=======
+# Compute the different efficiencies for ML
+>>>>>>> upstream/main
 for trackEvent, resolvedEvent in zip(data_ML_track, data_ML_resolved):
     # Merge two dataFrames and add indicator column
     merged_ML = pd.merge(
@@ -124,6 +130,10 @@ for trackEvent, resolvedEvent in zip(data_ML_track, data_ML_resolved):
         how="left",
         indicator="exists",
     )
+<<<<<<< HEAD
+=======
+
+>>>>>>> upstream/main
     # Add column to show if each row in first DataFrame exists in second
     merged_ML["exists"] = np.where(merged_ML.exists == "both", True, False)
     merged_ML.to_csv(path_or_buf="merged_ML.csv")
@@ -157,11 +167,20 @@ print("duplicate rate: ", 100 * nb_reco_duplicate / nb_reco_track, " %")
 print("Fake rate: ", 100 * nb_reco_fake / nb_reco_track, " %")
 
 print("===computed efficiencies ML===")
+<<<<<<< HEAD
 print("nb particles : ", nb_part)
 print("nb good match : ", nb_good_match_ML)
 print("nb particle reco : ", nb_reco_part_ML)
 print("nb track reco : ", nb_reco_track_ML)
 print("Efficiency (good track) : ", 100 * nb_good_match_ML / nb_part, " %")
 print("Efficiency (particle reco) : ", 100 * nb_reco_part_ML / nb_part, " %")
+=======
+print("nb particles: ", nb_part)
+print("nb good match: ", nb_good_match_ML)
+print("nb particle reco: ", nb_reco_part_ML)
+print("nb track reco: ", nb_reco_track_ML)
+print("Efficiency (good track): ", 100 * nb_good_match_ML / nb_part, " %")
+print("Efficiency (particle reco): ", 100 * nb_reco_part_ML / nb_part, " %")
+>>>>>>> upstream/main
 print("duplicate rate: ", 100 * nb_reco_duplicate_ML / nb_reco_track_ML, " %")
 print("Fake rate: ", 100 * nb_reco_fake_ML / nb_reco_track_ML, " %")

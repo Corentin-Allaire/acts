@@ -22,6 +22,7 @@
 #include "Acts/EventData/TrackStatePropMask.hpp"
 #include "Acts/EventData/VectorMultiTrajectory.hpp"
 #include "Acts/EventData/VectorTrackContainer.hpp"
+#include "Acts/EventData/detail/TestSourceLink.hpp"
 #include "Acts/Geometry/GeometryContext.hpp"
 #include "Acts/Geometry/GeometryIdentifier.hpp"
 #include "Acts/MagneticField/ConstantBField.hpp"
@@ -35,7 +36,6 @@
 #include "Acts/Tests/CommonHelpers/CubicTrackingGeometry.hpp"
 #include "Acts/Tests/CommonHelpers/LineSurfaceStub.hpp"
 #include "Acts/Tests/CommonHelpers/MeasurementsCreator.hpp"
-#include "Acts/Tests/CommonHelpers/TestSourceLink.hpp"
 #include "Acts/TrackFinding/CombinatorialKalmanFilter.hpp"
 #include "Acts/TrackFinding/MeasurementSelector.hpp"
 #include "Acts/TrackFitting/GainMatrixSmoother.hpp"
@@ -71,9 +71,16 @@ class TrackingGeometry;
 namespace {
 
 using namespace Acts::Test;
+using namespace Acts::detail::Test;
 using namespace Acts::UnitLiterals;
 
 static const auto pion = Acts::ParticleHypothesis::pion();
+
+using TrackContainer = Acts::TrackContainer<Acts::VectorTrackContainer,
+                                            Acts::VectorMultiTrajectory,
+                                            Acts::detail::ValueHolder>;
+using TrackStateContainerBackend =
+    typename TrackContainer::TrackStateContainerBackend;
 
 struct Detector {
   // expected number of measurements for the given detector
@@ -154,18 +161,16 @@ struct Fixture {
   using ConstantFieldPropagator =
       Acts::Propagator<ConstantFieldStepper, Acts::Navigator>;
 
-  using Trajectory = Acts::VectorMultiTrajectory;
-
   using KalmanUpdater = Acts::GainMatrixUpdater;
   using KalmanSmoother = Acts::GainMatrixSmoother;
   using CombinatorialKalmanFilter =
-      Acts::CombinatorialKalmanFilter<ConstantFieldPropagator, Trajectory>;
+      Acts::CombinatorialKalmanFilter<ConstantFieldPropagator, TrackContainer>;
   using TestSourceLinkContainer =
       std::unordered_multimap<Acts::GeometryIdentifier, TestSourceLink>;
   using TestSourceLinkAccessor = TestContainerAccessor<TestSourceLinkContainer>;
   using CombinatorialKalmanFilterOptions =
       Acts::CombinatorialKalmanFilterOptions<TestSourceLinkAccessor::Iterator,
-                                             Trajectory>;
+                                             TrackContainer>;
 
   KalmanUpdater kfUpdater;
   KalmanSmoother kfSmoother;
@@ -194,17 +199,16 @@ struct Fixture {
 
   Acts::MeasurementSelector measSel{measurementSelectorCfg};
 
-  Acts::CombinatorialKalmanFilterExtensions<Trajectory> getExtensions() const {
-    Acts::CombinatorialKalmanFilterExtensions<Trajectory> extensions;
-    extensions.calibrator
-        .template connect<&testSourceLinkCalibrator<Trajectory>>();
-    extensions.updater.template connect<&KalmanUpdater::operator()<Trajectory>>(
-        &kfUpdater);
-    extensions.smoother
-        .template connect<&KalmanSmoother::operator()<Trajectory>>(&kfSmoother);
-    extensions.measurementSelector
-        .template connect<&Acts::MeasurementSelector::select<Trajectory>>(
-            &measSel);
+  Acts::CombinatorialKalmanFilterExtensions<TrackContainer> getExtensions()
+      const {
+    Acts::CombinatorialKalmanFilterExtensions<TrackContainer> extensions;
+    extensions.calibrator.template connect<
+        &testSourceLinkCalibrator<TrackStateContainerBackend>>();
+    extensions.updater.template connect<
+        &KalmanUpdater::operator()<TrackStateContainerBackend>>(&kfUpdater);
+    extensions.measurementSelector.template connect<
+        &Acts::MeasurementSelector::select<TrackStateContainerBackend>>(
+        &measSel);
     return extensions;
   }
 
@@ -284,13 +288,11 @@ struct Fixture {
   }
 
   CombinatorialKalmanFilterOptions makeCkfOptions() const {
+    // leave the accessor empty, this will have to be set before running the CKF
     return CombinatorialKalmanFilterOptions(
         geoCtx, magCtx, calCtx,
-        Acts::SourceLinkAccessorDelegate<
-            TestSourceLinkAccessor::Iterator>{},  // leave the accessor empty,
-                                                  // this will have to be set
-                                                  // before running the CKF
-        getExtensions(), Acts::PropagatorPlainOptions());
+        Acts::SourceLinkAccessorDelegate<TestSourceLinkAccessor::Iterator>{},
+        getExtensions(), Acts::PropagatorPlainOptions(geoCtx, magCtx));
   }
 };
 
@@ -307,16 +309,14 @@ BOOST_AUTO_TEST_CASE(ZeroFieldForward) {
   // Construct a plane surface as the target surface
   auto pSurface = Acts::Surface::makeShared<Acts::PlaneSurface>(
       Acts::Vector3{-3_m, 0., 0.}, Acts::Vector3{1., 0., 0});
-  // Set the target surface
-  options.smoothingTargetSurface = pSurface.get();
 
   Fixture::TestSourceLinkAccessor slAccessor;
   slAccessor.container = &f.sourceLinks;
   options.sourcelinkAccessor.connect<&Fixture::TestSourceLinkAccessor::range>(
       &slAccessor);
 
-  Acts::TrackContainer tc{Acts::VectorTrackContainer{},
-                          Acts::VectorMultiTrajectory{}};
+  TrackContainer tc{Acts::VectorTrackContainer{},
+                    Acts::VectorMultiTrajectory{}};
 
   // run the CKF for all initial track states
   for (std::size_t trackId = 0u; trackId < f.startParameters.size();
@@ -366,16 +366,14 @@ BOOST_AUTO_TEST_CASE(ZeroFieldBackward) {
   // Construct a plane surface as the target surface
   auto pSurface = Acts::Surface::makeShared<Acts::PlaneSurface>(
       Acts::Vector3{3_m, 0., 0.}, Acts::Vector3{1., 0., 0});
-  // Set the target surface
-  options.smoothingTargetSurface = pSurface.get();
 
   Fixture::TestSourceLinkAccessor slAccessor;
   slAccessor.container = &f.sourceLinks;
   options.sourcelinkAccessor.connect<&Fixture::TestSourceLinkAccessor::range>(
       &slAccessor);
 
-  Acts::TrackContainer tc{Acts::VectorTrackContainer{},
-                          Acts::VectorMultiTrajectory{}};
+  TrackContainer tc{Acts::VectorTrackContainer{},
+                    Acts::VectorMultiTrajectory{}};
 
   // run the CKF for all initial track states
   for (std::size_t trackId = 0u; trackId < f.startParameters.size();

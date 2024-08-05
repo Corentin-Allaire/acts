@@ -23,6 +23,7 @@
 #include "Acts/Propagator/EigenStepper.hpp"
 #include "Acts/Propagator/EigenStepperError.hpp"
 #include "Acts/Propagator/Propagator.hpp"
+#include "Acts/Propagator/StepperOptions.hpp"
 #include "Acts/Propagator/detail/LoopStepperUtils.hpp"
 #include "Acts/Surfaces/Surface.hpp"
 #include "Acts/Utilities/Intersection.hpp"
@@ -256,12 +257,15 @@ class MultiEigenStepperLoop
   /// @brief How many components can this stepper manage?
   static constexpr int maxComponents = std::numeric_limits<int>::max();
 
-  /// Constructor from a magnetic field and a optionally provided Logger
-  MultiEigenStepperLoop(std::shared_ptr<const MagneticFieldProvider> bField,
-                        std::unique_ptr<const Logger> logger =
-                            getDefaultLogger("GSF", Logging::INFO))
-      : EigenStepper<extensionlist_t, auctioneer_t>(std::move(bField)),
-        m_logger(std::move(logger)) {}
+  struct Config {
+    std::shared_ptr<const MagneticFieldProvider> bField;
+  };
+
+  struct Options : public StepperPlainOptions {
+    void setPlainOptions(const StepperPlainOptions& options) {
+      static_cast<StepperPlainOptions&>(*this) = options;
+    }
+  };
 
   struct State {
     /// The struct that stores the individual components
@@ -331,6 +335,20 @@ class MultiEigenStepperLoop
       }
     }
   };
+
+  /// Constructor from a magnetic field and a optionally provided Logger
+  MultiEigenStepperLoop(std::shared_ptr<const MagneticFieldProvider> bField,
+                        std::unique_ptr<const Logger> logger =
+                            getDefaultLogger("GSF", Logging::INFO))
+      : EigenStepper<extensionlist_t, auctioneer_t>(std::move(bField)),
+        m_logger(std::move(logger)) {}
+
+  /// Constructor from a configuration and optionally provided Logger
+  MultiEigenStepperLoop(const Config& config,
+                        std::unique_ptr<const Logger> logger =
+                            getDefaultLogger("GSF", Logging::INFO))
+      : EigenStepper<extensionlist_t, auctioneer_t>(config),
+        m_logger(std::move(logger)) {}
 
   /// Construct and initialize a state
   State makeState(std::reference_wrapper<const GeometryContext> gctx,
@@ -577,12 +595,12 @@ class MultiEigenStepperLoop
   /// @param [in] surface The surface provided
   /// @param [in] index The surface intersection index
   /// @param [in] navDir The navigation direction
-  /// @param [in] bcheck The boundary check for this status update
+  /// @param [in] boundaryTolerance The boundary check for this status update
   /// @param [in] surfaceTolerance Surface tolerance used for intersection
   /// @param [in] logger A @c Logger instance
   Intersection3D::Status updateSurfaceStatus(
       State& state, const Surface& surface, std::uint8_t index,
-      Direction navDir, const BoundaryCheck& bcheck,
+      Direction navDir, const BoundaryTolerance& boundaryTolerance,
       ActsScalar surfaceTolerance = s_onSurfaceTolerance,
       const Logger& logger = getDummyLogger()) const {
     using Status = Intersection3D::Status;
@@ -591,7 +609,7 @@ class MultiEigenStepperLoop
 
     for (auto& component : state.components) {
       component.status = detail::updateSingleSurfaceStatus<SingleStepper>(
-          *this, component.state, surface, index, navDir, bcheck,
+          *this, component.state, surface, index, navDir, boundaryTolerance,
           surfaceTolerance, logger);
       ++counts[static_cast<std::size_t>(component.status)];
     }
@@ -662,30 +680,29 @@ class MultiEigenStepperLoop
   template <typename object_intersection_t>
   void updateStepSize(State& state, const object_intersection_t& oIntersection,
                       Direction direction, bool release = true) const {
-    const Surface& surface = *oIntersection.representation();
+    const Surface& surface = *oIntersection.object();
 
     for (auto& component : state.components) {
       auto intersection = surface.intersect(
           component.state.geoContext, SingleStepper::position(component.state),
           direction * SingleStepper::direction(component.state),
-          BoundaryCheck(true))[oIntersection.index()];
+          BoundaryTolerance::None())[oIntersection.index()];
 
       SingleStepper::updateStepSize(component.state, intersection, direction,
                                     release);
     }
   }
 
-  /// Set Step size - explicitly with a double
+  /// Update step size - explicitly with a double
   ///
   /// @param state [in,out] The stepping state (thread-local cache)
   /// @param stepSize [in] The step size value
   /// @param stype [in] The step size type to be set
   /// @param release [in] Do we release the step size?
-  void setStepSize(State& state, double stepSize,
-                   ConstrainedStep::Type stype = ConstrainedStep::actor,
-                   bool release = true) const {
+  void updateStepSize(State& state, double stepSize,
+                      ConstrainedStep::Type stype, bool release = true) const {
     for (auto& component : state.components) {
-      SingleStepper::setStepSize(component.state, stepSize, stype, release);
+      SingleStepper::updateStepSize(component.state, stepSize, stype, release);
     }
   }
 
@@ -708,9 +725,10 @@ class MultiEigenStepperLoop
   /// Release the step-size for all components
   ///
   /// @param state [in,out] The stepping state (thread-local cache)
-  void releaseStepSize(State& state) const {
+  /// @param [in] stype The step size type to be released
+  void releaseStepSize(State& state, ConstrainedStep::Type stype) const {
     for (auto& component : state.components) {
-      SingleStepper::releaseStepSize(component.state);
+      SingleStepper::releaseStepSize(component.state, stype);
     }
   }
 
@@ -724,14 +742,6 @@ class MultiEigenStepperLoop
     }
 
     return ss.str();
-  }
-
-  /// Overstep limit
-  ///
-  /// @param state [in] The stepping state (thread-local cache)
-  double overstepLimit(const State& state) const {
-    // A dynamic overstep limit could sit here
-    return SingleStepper::overstepLimit(state.components.front().state);
   }
 
   /// Create and return the bound state at the current position
@@ -758,6 +768,21 @@ class MultiEigenStepperLoop
       State& state, const Surface& surface, bool transportCov = true,
       const FreeToBoundCorrection& freeToBoundCorrection =
           FreeToBoundCorrection(false)) const;
+
+  /// @brief If necessary fill additional members needed for curvilinearState
+  ///
+  /// Compute path length derivatives in case they have not been computed
+  /// yet, which is the case if no step has been executed yet.
+  ///
+  /// @param [in, out] prop_state State that will be presented as @c BoundState
+  /// @param [in] navigator the navigator of the propagation
+  /// @return true if nothing is missing after this call, false otherwise.
+  template <typename propagator_state_t, typename navigator_t>
+  bool prepareCurvilinearState(
+      [[maybe_unused]] propagator_state_t& prop_state,
+      [[maybe_unused]] const navigator_t& navigator) const {
+    return true;
+  }
 
   /// Create and return a curvilinear state at the current position
   ///

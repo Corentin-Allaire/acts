@@ -61,50 +61,51 @@ def run() -> None:
         "Acts::RotationMatrix3",
         "Acts::Translation2",
         "Acts::Translation3",
-        "Acts::GeometryContext",
         "Acts::FreeVector",
         "Acts::FreeMatrix",
         "Acts::SurfaceVector",
         "Acts::Intersection3D",
-        "Acts::OrientedSurface",
-        "Acts::OrientedSurfaces",
         "Acts::BoundToFreeMatrix",
         "Acts::FreeToBoundMatrix",
         "Acts::FreeSquareMatrix",
         "Acts::FreeToPathMatrix",
+        "Acts::HashedString",
     }
 
     role_instances["struct"] |= {
-        "Acts::DenseStepperPropagatorOptions",
-        "Acts::Experimental::DetectorNavigator::State",
         "Acts::Geant4PhysicalVolumeSelectors::AllSelector",
         "Acts::Geant4PhysicalVolumeSelectors::NameSelector",
+        "Acts::Geant4PhysicalVolumeSelectors::PositionSelector",
+        "Acts::OrientedSurface",
     }
 
     role_instances["class"] |= {
+        "Acts::GeometryContext",
+        "Acts::MagneticFieldContext",
+        "Acts::CalibrationContext",
         "Acts::BinningData",
         "Acts::Direction",
         "Acts::ConstrainedStep",
+        "Acts::Axis",
         "Acts::IAxis",
         "Acts::SeedFilter",
-        "Acts::BoundaryCheck",
+        "Acts::BoundaryTolerance",
         "Acts::ConeVolumeBounds",
         "Acts::CuboidVolumeBounds",
         "Acts::CylinderVolumeBounds",
         "Acts::CutoutCylinderVolumeBounds",
         "Acts::GenericCuboidVolumeBounds",
         "Acts::TrapezoidVolumeBounds",
+        "Acts::CylinderVolumeStack",
         "Acts::GeometryObject",
         "Acts::TrackContainer",
         "Acts::ConeLayer",
         "Acts::CylinderLayer",
-        "Acts::IdentifiedDetectorElement",
         "Acts::DiscLayer",
         "Acts::PlaneLayer",
         "Acts::NullBField",
         "Acts::DiscBounds",
         "Acts::PlanarBounds",
-        "Acts::AbstractVolume",
         "Acts::AnnulusBounds",
         "Acts::DiamondBounds",
         "Acts::RegularSurface",
@@ -116,6 +117,7 @@ def run() -> None:
         "Acts::Logging::TimedOutputDecorator",
         "Acts::Logging::DefaultFilterPolicy",
         "Acts::Logging::DefaultPrintPolicy",
+        "Acts::SourceLink",
     }
 
     role_instances["func"] = {
@@ -135,6 +137,9 @@ def run() -> None:
         "Acts::BoundIndices",
         "Acts::FreeIndices",
         "Acts::MagneticFieldError",
+        "Acts::TrackStatePropMask",
+        "Acts::AxisType",
+        "Acts::AxisBoundaryType",
     }
 
     role_ex = re.compile(r"[{:](" + "|".join(roles) + r")[}:]`(.+?)`")

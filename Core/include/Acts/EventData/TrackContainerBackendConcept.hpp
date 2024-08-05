@@ -9,15 +9,13 @@
 #pragma once
 
 #include "Acts/Definitions/TrackParametrization.hpp"
+#include "Acts/EventData/MultiTrajectoryBackendConcept.hpp"
+#include "Acts/EventData/ParticleHypothesis.hpp"
 #include "Acts/EventData/Types.hpp"
 #include "Acts/Surfaces/Surface.hpp"
 #include "Acts/Utilities/HashedString.hpp"
 
 #include <any>
-#include <type_traits>
-
-#if defined(__cpp_concepts)
-#include <concepts>
 
 namespace Acts {
 
@@ -43,6 +41,11 @@ concept ConstTrackContainerBackend = requires(const T& cv, HashedString key,
   { cv.hasColumn_impl(key) } -> std::same_as<bool>;
 
   { cv.referenceSurface_impl(itrack) } -> std::same_as<const Surface*>;
+
+  { cv.particleHypothesis_impl(itrack) } -> std::same_as<ParticleHypothesis>;
+
+  {cv.dynamicKeys_impl()};
+  requires detail::RangeLike<decltype(cv.dynamicKeys_impl())>;
 };
 
 template <typename T>
@@ -57,22 +60,27 @@ concept MutableTrackContainerBackend = ConstTrackContainerBackend<T> &&
 
   {v.removeTrack_impl(itrack)};
 
-  // As far as I know there's no good way to assert that there's a generic
-  // template function
-  {v.template addColumn_impl<uint32_t>(col)};
-  {v.template addColumn_impl<uint64_t>(col)};
-  {v.template addColumn_impl<int32_t>(col)};
-  {v.template addColumn_impl<int64_t>(col)};
+  // As far as I know there's no good way to assert that there's a
+  // generic template function
+  {v.template addColumn_impl<std::uint32_t>(col)};
+  {v.template addColumn_impl<std::uint64_t>(col)};
+  {v.template addColumn_impl<std::int32_t>(col)};
+  {v.template addColumn_impl<std::int64_t>(col)};
   {v.template addColumn_impl<float>(col)};
   {v.template addColumn_impl<double>(col)};
 
-  {v.copyDynamicFrom_impl(itrack, other, itrack)};
+  {v.copyDynamicFrom_impl(itrack, key, std::declval<const std::any&>())};
 
   {v.ensureDynamicColumns_impl(other)};
 
   {v.reserve(itrack)};
 
   {v.setReferenceSurface_impl(itrack, sharedSurface)};
+
+  {v.setParticleHypothesis_impl(
+      itrack, std::declval<const Acts::ParticleHypothesis&>())};
+
+  {v.clear()};
 };
 
 template <typename T>
@@ -81,7 +89,4 @@ struct IsReadOnlyTrackContainer;
 template <typename T>
 concept TrackContainerBackend = ConstTrackContainerBackend<T> &&
     (IsReadOnlyTrackContainer<T>::value || MutableTrackContainerBackend<T>);
-
 }  // namespace Acts
-
-#endif

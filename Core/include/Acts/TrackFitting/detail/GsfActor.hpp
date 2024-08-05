@@ -29,8 +29,7 @@
 #include <map>
 #include <numeric>
 
-namespace Acts {
-namespace detail {
+namespace Acts::detail {
 
 template <typename traj_t>
 struct GsfResult {
@@ -56,7 +55,10 @@ struct GsfResult {
   std::vector<const Acts::Surface*> visitedSurfaces;
   std::vector<const Acts::Surface*> surfacesVisitedBwdAgain;
 
-  std::size_t nInvalidBetheHeitler = 0;
+  /// Statistics about material encounterings
+  Updatable<std::size_t> nInvalidBetheHeitler;
+  Updatable<double> maxPathXOverX0;
+  Updatable<double> sumPathXOverX0;
 
   // Propagate potential errors to the outside
   Result<void> result{Result<void>::success()};
@@ -150,7 +152,7 @@ struct GsfActor {
 
     // Return is we found an error earlier
     if (!result.result.ok()) {
-      ACTS_WARNING("result.result not ok, return!")
+      ACTS_WARNING("result.result not ok, return!");
       return;
     }
 
@@ -230,6 +232,15 @@ struct GsfActor {
       return;
     }
 
+    // Update the counters. Note that this should be done before potential
+    // material interactions, because if this is our last measurement this would
+    // not influence the fit anymore.
+    if (haveMeasurement) {
+      result.maxPathXOverX0.update();
+      result.sumPathXOverX0.update();
+      result.nInvalidBetheHeitler.update();
+    }
+
     for (auto cmp : stepper.componentIterable(state.stepping)) {
       auto singleState = cmp.singleState(state);
       cmp.singleStepper(stepper).transportCovarianceToBound(
@@ -287,7 +298,7 @@ struct GsfActor {
       componentCache.clear();
 
       convoluteComponents(state, stepper, navigator, tmpStates, componentCache,
-                          result.nInvalidBetheHeitler);
+                          result);
 
       if (componentCache.empty()) {
         ACTS_WARNING(
@@ -328,8 +339,9 @@ struct GsfActor {
                            const navigator_t& navigator,
                            const TemporaryStates& tmpStates,
                            std::vector<ComponentCache>& componentCache,
-                           std::size_t& nInvalidBetheHeitler) const {
+                           result_type& result) const {
     auto cmps = stepper.componentIterable(state.stepping);
+    double pathXOverX0 = 0.0;
     for (auto [idx, cmp] : zip(tmpStates.tips, cmps)) {
       auto proxy = tmpStates.traj.getTrackState(idx);
 
@@ -337,42 +349,51 @@ struct GsfActor {
                                  proxy.filtered(), proxy.filteredCovariance(),
                                  stepper.particleHypothesis(state.stepping));
 
-      applyBetheHeitler(state, navigator, bound, tmpStates.weights.at(idx),
-                        componentCache, nInvalidBetheHeitler);
+      pathXOverX0 +=
+          applyBetheHeitler(state, navigator, bound, tmpStates.weights.at(idx),
+                            componentCache, result);
     }
+
+    // Store average material seen by the components
+    // Should not be too broadly distributed
+    result.sumPathXOverX0.tmp() += pathXOverX0 / tmpStates.tips.size();
   }
 
   template <typename propagator_state_t, typename navigator_t>
-  void applyBetheHeitler(const propagator_state_t& state,
-                         const navigator_t& navigator,
-                         const BoundTrackParameters& old_bound,
-                         const double old_weight,
-                         std::vector<ComponentCache>& componentCaches,
-                         std::size_t& nInvalidBetheHeitler) const {
+  double applyBetheHeitler(const propagator_state_t& state,
+                           const navigator_t& navigator,
+                           const BoundTrackParameters& old_bound,
+                           const double old_weight,
+                           std::vector<ComponentCache>& componentCaches,
+                           result_type& result) const {
     const auto& surface = *navigator.currentSurface(state.navigation);
     const auto p_prev = old_bound.absoluteMomentum();
+    const auto& particleHypothesis = old_bound.particleHypothesis();
 
     // Evaluate material slab
     auto slab = surface.surfaceMaterial()->materialSlab(
         old_bound.position(state.stepping.geoContext), state.options.direction,
         MaterialUpdateStage::FullUpdate);
 
-    auto pathCorrection = surface.pathCorrection(
+    const auto pathCorrection = surface.pathCorrection(
         state.stepping.geoContext,
         old_bound.position(state.stepping.geoContext), old_bound.direction());
     slab.scaleThickness(pathCorrection);
 
+    const double pathXOverX0 = slab.thicknessInX0();
+    result.maxPathXOverX0.tmp() =
+        std::max(result.maxPathXOverX0.tmp(), pathXOverX0);
+
     // Emit a warning if the approximation is not valid for this x/x0
-    if (!m_cfg.bethe_heitler_approx->validXOverX0(slab.thicknessInX0())) {
-      ++nInvalidBetheHeitler;
+    if (!m_cfg.bethe_heitler_approx->validXOverX0(pathXOverX0)) {
+      ++result.nInvalidBetheHeitler.tmp();
       ACTS_DEBUG(
           "Bethe-Heitler approximation encountered invalid value for x/x0="
-          << slab.thicknessInX0() << " at surface " << surface.geometryId());
+          << pathXOverX0 << " at surface " << surface.geometryId());
     }
 
     // Get the mixture
-    const auto mixture =
-        m_cfg.bethe_heitler_approx->mixture(slab.thicknessInX0());
+    const auto mixture = m_cfg.bethe_heitler_approx->mixture(pathXOverX0);
 
     // Create all possible new components
     for (const auto& gaussian : mixture) {
@@ -403,7 +424,8 @@ struct GsfActor {
       }();
 
       assert(p_prev + delta_p > 0. && "new momentum must be > 0");
-      new_pars[eBoundQOverP] = old_bound.charge() / (p_prev + delta_p);
+      new_pars[eBoundQOverP] =
+          particleHypothesis.qOverP(p_prev + delta_p, old_bound.charge());
 
       // compute inverse variance of p from mixture and update covariance
       auto new_cov = old_bound.covariance().value();
@@ -424,6 +446,8 @@ struct GsfActor {
       // Set the remaining things and push to vector
       componentCaches.push_back({new_weight, new_pars, new_cov});
     }
+
+    return pathXOverX0;
   }
 
   /// Remove components with low weights and renormalize from the component
@@ -506,7 +530,10 @@ struct GsfActor {
       }
 
       auto& cmp = *res;
-      cmp.jacToGlobal() = surface.boundToFreeJacobian(state.geoContext, pars);
+      auto freeParams = cmp.pars();
+      cmp.jacToGlobal() = surface.boundToFreeJacobian(
+          state.geoContext, freeParams.template segment<3>(eFreePos0),
+          freeParams.template segment<3>(eFreeDir0));
       cmp.pathAccumulated() = state.stepping.pathAccumulated;
       cmp.jacobian() = Acts::BoundMatrix::Identity();
       cmp.derivative() = Acts::FreeVector::Zero();
@@ -709,9 +736,8 @@ struct GsfActor {
                     TrackStatePropMask::Filtered | TrackStatePropMask::Smoothed
               : TrackStatePropMask::Calibrated | TrackStatePropMask::Predicted;
 
-      result.currentTip =
-          result.fittedStates->addTrackState(mask, result.currentTip);
-      auto proxy = result.fittedStates->getTrackState(result.currentTip);
+      auto proxy = result.fittedStates->makeTrackState(mask, result.currentTip);
+      result.currentTip = proxy.index();
 
       proxy.setReferenceSurface(surface.getSharedPtr());
       proxy.copyFrom(firstCmpProxy, mask);
@@ -773,5 +799,4 @@ struct GsfActor {
   }
 };
 
-}  // namespace detail
-}  // namespace Acts
+}  // namespace Acts::detail

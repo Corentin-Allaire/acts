@@ -85,6 +85,10 @@ auto SeedFinderOrthogonal<external_spacepoint_t>::validTupleOrthoRangeLH(
   res[DimPhi].shrinkMin(pL - m_config.deltaPhiMax);
   res[DimPhi].shrinkMax(pL + m_config.deltaPhiMax);
 
+  // Cut: Ensure that z-distance between SPs is within max and min values.
+  res[DimZ].shrinkMin(zL - m_config.deltaZMax);
+  res[DimZ].shrinkMax(zL + m_config.deltaZMax);
+
   return res;
 }
 
@@ -93,6 +97,7 @@ auto SeedFinderOrthogonal<external_spacepoint_t>::validTupleOrthoRangeHL(
     const internal_sp_t &high) const -> typename tree_t::range_t {
   float pM = high.phi();
   float rM = high.radius();
+  float zM = high.z();
 
   typename tree_t::range_t res;
 
@@ -129,19 +134,23 @@ auto SeedFinderOrthogonal<external_spacepoint_t>::validTupleOrthoRangeHL(
    */
   float fracR = res[DimR].min() / rM;
 
-  float zMin = (high.z() - m_config.collisionRegionMin) * fracR +
-               m_config.collisionRegionMin;
-  float zMax = (high.z() - m_config.collisionRegionMax) * fracR +
-               m_config.collisionRegionMax;
+  float zMin =
+      (zM - m_config.collisionRegionMin) * fracR + m_config.collisionRegionMin;
+  float zMax =
+      (zM - m_config.collisionRegionMax) * fracR + m_config.collisionRegionMax;
 
-  res[DimZ].shrinkMin(std::min(zMin, high.z()));
-  res[DimZ].shrinkMax(std::max(zMax, high.z()));
+  res[DimZ].shrinkMin(std::min(zMin, zM));
+  res[DimZ].shrinkMax(std::max(zMax, zM));
 
   /*
    * Cut: Shrink the φ range, such that Δφ_min ≤ φ - φ_H ≤ Δφ_max
    */
   res[DimPhi].shrinkMin(pM - m_config.deltaPhiMax);
   res[DimPhi].shrinkMax(pM + m_config.deltaPhiMax);
+
+  // Cut: Ensure that z-distance between SPs is within max and min values.
+  res[DimZ].shrinkMin(zM - m_config.deltaZMax);
+  res[DimZ].shrinkMax(zM + m_config.deltaZMax);
 
   return res;
 }
@@ -219,10 +228,13 @@ bool SeedFinderOrthogonal<external_spacepoint_t>::validTuple(
   if (std::fabs(cotTheta) > m_config.cotThetaMax) {
     return false;
   }
+
   /*
-   * Cut: Ensure that z-distance between SPs is within max and min values.
+   * Cut: Ensure that inner-middle dublet is in a certain (r, eta) region of the
+   * detector according to detector specific cuts.
    */
-  if (std::abs(deltaZ) > m_config.deltaZMax) {
+  const float rInner = (isMiddleInverted) ? rH : rL;
+  if (!m_config.experimentCuts(rInner, cotTheta)) {
     return false;
   }
 
@@ -351,7 +363,8 @@ void SeedFinderOrthogonal<external_spacepoint_t>::filterCandidates(
         bottom[b]->radius() > seedFilterState.rMaxSeedConf) {
       minCompatibleTopSPs = 1;
     }
-    if (m_config.seedConfirmation && seedFilterState.numQualitySeeds) {
+    if (m_config.seedConfirmation &&
+        candidates_collector.nHighQualityCandidates()) {
       minCompatibleTopSPs++;
     }
 
@@ -453,7 +466,7 @@ void SeedFinderOrthogonal<external_spacepoint_t>::filterCandidates(
     }
 
     // continue if number of top SPs is smaller than minimum required for filter
-    if (top.size() < minCompatibleTopSPs) {
+    if (top_valid.size() < minCompatibleTopSPs) {
       continue;
     }
 
@@ -664,9 +677,8 @@ void SeedFinderOrthogonal<external_spacepoint_t>::processFromMiddleSP(
    */
   if ((!bottom_lh_v.empty() && !top_lh_v.empty()) ||
       (!bottom_hl_v.empty() && !top_hl_v.empty())) {
-    m_config.seedFilter->filterSeeds_1SpFixed(
-        spacePointData, candidates_collector, seedFilterState.numQualitySeeds,
-        std::back_inserter(out_cont));
+    m_config.seedFilter->filterSeeds_1SpFixed(spacePointData,
+                                              candidates_collector, out_cont);
   }
 }
 
@@ -730,17 +742,17 @@ void SeedFinderOrthogonal<external_spacepoint_t>::createSeeds(
   spacePointData.resize(spacePoints.size());
 
   for (const external_spacepoint_t *p : spacePoints) {
-    auto [position, variance] = extract_coordinates(p);
+    auto [position, variance, time] = extract_coordinates(p);
     internalSpacePoints.push_back(new InternalSpacePoint<external_spacepoint_t>(
-        counter++, *p, position, options.beamPos, variance));
+        counter++, *p, position, options.beamPos, variance, time));
     // store x,y,z values in extent
     rRangeSPExtent.extend(position);
   }
   // variable middle SP radial region of interest
   const Acts::Range1D<float> rMiddleSPRange(
-      std::floor(rRangeSPExtent.min(Acts::binR) / 2) * 2 +
+      std::floor(rRangeSPExtent.min(Acts::BinningValue::binR) / 2) * 2 +
           m_config.deltaRMiddleMinSPRange,
-      std::floor(rRangeSPExtent.max(Acts::binR) / 2) * 2 -
+      std::floor(rRangeSPExtent.max(Acts::BinningValue::binR) / 2) * 2 -
           m_config.deltaRMiddleMaxSPRange);
 
   /*

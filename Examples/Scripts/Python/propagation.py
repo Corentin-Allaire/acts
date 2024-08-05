@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
+
 import os
 
 import acts
 import acts.examples
-
 from acts.examples import GenericDetector, AlignedDetector
-from common import getOpenDataDetectorDirectory
+from acts.examples.odd import getOpenDataDetectorDirectory
 
 u = acts.UnitConstants
 
@@ -23,6 +23,7 @@ def runPropagation(trackingGeometry, field, outputDir, s=None, decorators=[]):
     stepper = acts.EigenStepper(field)
     # stepper = acts.AtlasStepper(field)
     # stepper = acts.StraightLineStepper()
+    # stepper = acts.SympyStepper(field)
 
     print("We're running with:", type(stepper).__name__)
     prop = acts.examples.ConcretePropagator(acts.Propagator(stepper, nav))

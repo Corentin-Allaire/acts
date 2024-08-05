@@ -82,11 +82,20 @@ ActsExamples::ProcessCode ActsExamples::CsvSeedWriter::writeT(
     throw std::ios_base::failure("Could not open '" + path + "' to write");
   }
 
+<<<<<<< HEAD
   std::unordered_map<size_t, seedInfo> infoMap;
   std::unordered_map<ActsFatras::Barcode, std::pair<size_t, float>> goodSeed;
 
   // Loop over the estimated track parameters
   for (size_t iparams = 0; iparams < trackParams.size(); ++iparams) {
+=======
+  std::unordered_map<std::size_t, SeedInfo> infoMap;
+  std::unordered_map<ActsFatras::Barcode, std::pair<std::size_t, float>>
+      goodSeed;
+
+  // Loop over the estimated track parameters
+  for (std::size_t iparams = 0; iparams < trackParams.size(); ++iparams) {
+>>>>>>> upstream/main
     // The estimated bound parameters vector
     const auto params = trackParams[iparams].parameters();
 
@@ -137,7 +146,11 @@ ActsExamples::ProcessCode ActsExamples::CsvSeedWriter::writeT(
       }
     }
     // Store the global position of the space points
+<<<<<<< HEAD
     std::vector<Acts::Vector3> globalPosition;
+=======
+    boost::container::small_vector<Acts::Vector3, 3> globalPosition;
+>>>>>>> upstream/main
     for (auto spacePointPtr : seed.sp()) {
       Acts::Vector3 pos(spacePointPtr->x(), spacePointPtr->y(),
                         spacePointPtr->z());
@@ -145,8 +158,13 @@ ActsExamples::ProcessCode ActsExamples::CsvSeedWriter::writeT(
     }
 
     // track info
+<<<<<<< HEAD
     seedInfo toAdd;
     toAdd.seedId = iparams;
+=======
+    SeedInfo toAdd;
+    toAdd.seedID = iparams;
+>>>>>>> upstream/main
     toAdd.particleId = majorityParticleId;
     toAdd.seedPt = std::abs(1.0 / params[Acts::eBoundQOverP]) *
                    std::sin(params[Acts::eBoundTheta]);
@@ -159,7 +177,11 @@ ActsExamples::ProcessCode ActsExamples::CsvSeedWriter::writeT(
     toAdd.seedType = truthMatched ? "duplicate" : "fake";
     toAdd.measurementsID = ptrack;
 
+<<<<<<< HEAD
     infoMap[toAdd.seedId] = toAdd;
+=======
+    infoMap[toAdd.seedID] = toAdd;
+>>>>>>> upstream/main
   }
 
   mos << "seed_id,particleId,"
@@ -176,11 +198,19 @@ ActsExamples::ProcessCode ActsExamples::CsvSeedWriter::writeT(
       info.seedType = "good";
     }
     // write the track info
+<<<<<<< HEAD
     mos << info.seedId << ",";
     mos << info.particleId << ",";
     mos << info.seedPt << ",";
     mos << info.seedPhi << ",";
     mos << info.seedEta << ",";
+=======
+    mos << info.seedID << ",";
+    mos << info.particleId << ",";
+    mos << info.seedPt << ",";
+    mos << info.seedEta << ",";
+    mos << info.seedPhi << ",";
+>>>>>>> upstream/main
     for (auto& point : info.globalPosition) {
       mos << point.x() << ",";
       mos << point.y() << ",";

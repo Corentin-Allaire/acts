@@ -12,7 +12,6 @@
 #include "Acts/Definitions/Algebra.hpp"
 #include "Acts/MagneticField/BFieldMapUtils.hpp"
 #include "Acts/MagneticField/InterpolatedBFieldMap.hpp"
-#include "Acts/MagneticField/detail/SmallObjectCache.hpp"
 #include "Acts/Tests/CommonHelpers/FloatComparisons.hpp"
 #include "Acts/Utilities/Result.hpp"
 #include "Acts/Utilities/VectorHelpers.hpp"
@@ -27,11 +26,9 @@ namespace bdata = boost::unit_test::data;
 
 using Acts::VectorHelpers::perp;
 
-namespace Acts {
+using namespace Acts::detail;
 
-using namespace detail;
-
-namespace Test {
+namespace Acts::Test {
 
 BOOST_AUTO_TEST_CASE(bfield_creation) {
   // create grid values
@@ -248,15 +245,15 @@ BOOST_AUTO_TEST_CASE(bfield_symmetry) {
 /// Unit test for symmetric data
 BOOST_DATA_TEST_CASE(
     bfield_symmetry_random,
-    bdata::random(
-        (bdata::seed = 0,
-         bdata::distribution = std::uniform_real_distribution<>(-10., 10.))) ^
-        bdata::random((bdata::seed = 0,
+    bdata::random((bdata::engine = std::mt19937(), bdata::seed = 0,
+                   bdata::distribution =
+                       std::uniform_real_distribution<double>(-10., 10.))) ^
+        bdata::random((bdata::engine = std::mt19937(), bdata::seed = 0,
                        bdata::distribution =
-                           std::uniform_real_distribution<>(-10., 10.))) ^
-        bdata::random((bdata::seed = 0,
+                           std::uniform_real_distribution<double>(-10., 10.))) ^
+        bdata::random((bdata::engine = std::mt19937(), bdata::seed = 0,
                        bdata::distribution =
-                           std::uniform_real_distribution<>(-20., 20.))) ^
+                           std::uniform_real_distribution<double>(-20., 20.))) ^
         bdata::xrange(10),
     x, y, z, index) {
   (void)index;
@@ -369,5 +366,5 @@ BOOST_DATA_TEST_CASE(
   CHECK_CLOSE_REL(value0_xyz, value3_xyz, 1e-10);
   CHECK_CLOSE_REL(value0_xyz, value4_xyz, 1e-10);
 }
-}  // namespace Test
-}  // namespace Acts
+
+}  // namespace Acts::Test

@@ -10,6 +10,7 @@
 
 #include "Acts/Definitions/Algebra.hpp"
 #include "Acts/Utilities/BinningType.hpp"
+#include "Acts/Utilities/Helpers.hpp"
 #include "Acts/Utilities/ThrowAssert.hpp"
 #include "Acts/Utilities/VectorHelpers.hpp"
 
@@ -240,13 +241,11 @@ class BinningData {
   /// @return float value according to the binning setup
   float value(const Vector2& lposition) const {
     // ordered after occurrence
-    if (binvalue == binR || binvalue == binRPhi || binvalue == binX ||
-        binvalue == binH) {
+    if (binvalue == BinningValue::binR || binvalue == BinningValue::binRPhi ||
+        binvalue == BinningValue::binX || binvalue == BinningValue::binH) {
       return lposition[0];
     }
-    if (binvalue == binPhi) {
-      return lposition[1];
-    }
+
     return lposition[1];
   }
 
@@ -260,17 +259,17 @@ class BinningData {
     using VectorHelpers::perp;
     using VectorHelpers::phi;
     // ordered after occurrence
-    if (binvalue == binR || binvalue == binH) {
+    if (binvalue == BinningValue::binR || binvalue == BinningValue::binH) {
       return (perp(position));
     }
-    if (binvalue == binRPhi) {
+    if (binvalue == BinningValue::binRPhi) {
       return (perp(position) * phi(position));
     }
-    if (binvalue == binEta) {
+    if (binvalue == BinningValue::binEta) {
       return (eta(position));
     }
-    if (binvalue < 3) {
-      return (position[binvalue]);
+    if (toUnderlying(binvalue) < 3) {
+      return static_cast<float>(position[toUnderlying(binvalue)]);
     }
     // phi gauging
     return phi(position);
@@ -504,9 +503,10 @@ class BinningData {
     }
     // if outside boundary : return boundary for open, opposite bin for closed
     bin = bin < 0 ? ((bData.option == open) ? 0 : (bData.m_bins - 1)) : bin;
-    return std::size_t((bin <= int(bData.m_bins - 1))
-                           ? bin
-                           : ((bData.option == open) ? (bData.m_bins - 1) : 0));
+    return static_cast<std::size_t>(
+        (bin <= static_cast<int>(bData.m_bins - 1))
+            ? bin
+            : ((bData.option == open) ? (bData.m_bins - 1) : 0));
   }
 
   // Search in arbitrary boundary
@@ -534,9 +534,12 @@ class BinningData {
   std::string toString(const std::string& indent) const {
     std::stringstream sl;
     sl << indent << "BinngingData object:" << '\n';
-    sl << indent << "  - type       : " << std::size_t(type) << '\n';
-    sl << indent << "  - option     : " << std::size_t(option) << '\n';
-    sl << indent << "  - value      : " << std::size_t(binvalue) << '\n';
+    sl << indent << "  - type       : " << static_cast<std::size_t>(type)
+       << '\n';
+    sl << indent << "  - option     : " << static_cast<std::size_t>(option)
+       << '\n';
+    sl << indent << "  - value      : " << static_cast<std::size_t>(binvalue)
+       << '\n';
     sl << indent << "  - bins       : " << bins() << '\n';
     sl << indent << "  - min/max    : " << min << " / " << max << '\n';
     if (type == equidistant) {

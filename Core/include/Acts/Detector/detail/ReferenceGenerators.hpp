@@ -16,9 +16,7 @@
 
 #include <vector>
 
-namespace Acts {
-namespace Experimental {
-namespace detail {
+namespace Acts::Experimental::detail {
 
 /// A struct to access the center position
 ///
@@ -43,7 +41,7 @@ struct CenterReferenceGenerator {
 ///
 /// This generator will provide only one filling point and hence
 /// only a single bin in the indexed grid.
-template <BinningValue bVAL = BinningValue::binValues>
+template <BinningValue bVAL>
 struct BinningValueReferenceGenerator {
   /// Helper to access a reference position based on binning value
   ///
@@ -94,6 +92,4 @@ struct PolyhedronReferenceGenerator {
   }
 };
 
-}  // namespace detail
-}  // namespace Experimental
-}  // namespace Acts
+}  // namespace Acts::Experimental::detail

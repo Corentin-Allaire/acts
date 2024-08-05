@@ -72,11 +72,15 @@ const auto defaultNullBField = std::make_shared<NullBField>();
 const auto particleHypothesis = ParticleHypothesis::pion();
 
 struct Options {
-  double stepTolerance = 1e-4;
-  double stepSizeCutOff = 0.0;
-  std::size_t maxRungeKuttaStepTrials = 10;
   Direction direction = defaultNDir;
+
   const Acts::Logger &logger = Acts::getDummyLogger();
+
+  struct {
+    double stepTolerance = 1e-4;
+    double stepSizeCutOff = 0.0;
+    std::size_t maxRungeKuttaStepTrials = 10;
+  } stepping;
 };
 
 struct MockNavigator {};
@@ -392,18 +396,21 @@ void test_multi_stepper_surface_status_update() {
 
   // Update surface status and check
   {
-    auto status = multi_stepper.updateSurfaceStatus(multi_state, *right_surface,
-                                                    0, Direction::Forward,
-                                                    BoundaryCheck(false));
+    auto status = multi_stepper.updateSurfaceStatus(
+        multi_state, *right_surface, 0, Direction::Forward,
+        BoundaryTolerance::Infinite());
 
     BOOST_CHECK_EQUAL(status, Intersection3D::Status::reachable);
 
     auto cmp_iterable = multi_stepper.constComponentIterable(multi_state);
+    auto cmp_1 = *cmp_iterable.begin();
+    auto cmp_2 = *(++cmp_iterable.begin());
 
-    BOOST_CHECK_EQUAL((*cmp_iterable.begin()).status(),
-                      Intersection3D::Status::reachable);
-    BOOST_CHECK_EQUAL((*(++cmp_iterable.begin())).status(),
-                      Intersection3D::Status::missed);
+    BOOST_CHECK_EQUAL(cmp_1.status(), Intersection3D::Status::reachable);
+    BOOST_CHECK_EQUAL(cmp_2.status(), Intersection3D::Status::reachable);
+
+    BOOST_CHECK_EQUAL(cmp_1.cmp.state.stepSize.value(), 1.0);
+    BOOST_CHECK_EQUAL(cmp_2.cmp.state.stepSize.value(), -1.0);
   }
 
   // Step forward now
@@ -418,34 +425,37 @@ void test_multi_stepper_surface_status_update() {
 
   // Update surface status and check again
   {
-    auto status = multi_stepper.updateSurfaceStatus(multi_state, *right_surface,
-                                                    0, Direction::Forward,
-                                                    BoundaryCheck(false));
+    auto status = multi_stepper.updateSurfaceStatus(
+        multi_state, *right_surface, 0, Direction::Forward,
+        BoundaryTolerance::Infinite());
 
     BOOST_CHECK_EQUAL(status, Intersection3D::Status::onSurface);
 
     auto cmp_iterable = multi_stepper.constComponentIterable(multi_state);
+    auto cmp_1 = *cmp_iterable.begin();
+    auto cmp_2 = *(++cmp_iterable.begin());
 
-    BOOST_CHECK_EQUAL((*cmp_iterable.begin()).status(),
-                      Intersection3D::Status::onSurface);
-    BOOST_CHECK_EQUAL((*(++cmp_iterable.begin())).status(),
-                      Intersection3D::Status::missed);
+    BOOST_CHECK_EQUAL(cmp_1.status(), Intersection3D::Status::onSurface);
+    BOOST_CHECK_EQUAL(cmp_2.status(), Intersection3D::Status::onSurface);
   }
 
-  // Start surface should be unreachable
+  // Start surface should be reachable
   {
-    auto status = multi_stepper.updateSurfaceStatus(multi_state, *start_surface,
-                                                    0, Direction::Forward,
-                                                    BoundaryCheck(false));
+    auto status = multi_stepper.updateSurfaceStatus(
+        multi_state, *start_surface, 0, Direction::Forward,
+        BoundaryTolerance::Infinite());
 
-    BOOST_CHECK_EQUAL(status, Intersection3D::Status::unreachable);
+    BOOST_CHECK_EQUAL(status, Intersection3D::Status::reachable);
 
     auto cmp_iterable = multi_stepper.constComponentIterable(multi_state);
+    auto cmp_1 = *cmp_iterable.begin();
+    auto cmp_2 = *(++cmp_iterable.begin());
 
-    BOOST_CHECK_EQUAL((*cmp_iterable.begin()).status(),
-                      Intersection3D::Status::unreachable);
-    BOOST_CHECK_EQUAL((*(++cmp_iterable.begin())).status(),
-                      Intersection3D::Status::unreachable);
+    BOOST_CHECK_EQUAL(cmp_1.status(), Intersection3D::Status::reachable);
+    BOOST_CHECK_EQUAL(cmp_2.status(), Intersection3D::Status::reachable);
+
+    BOOST_CHECK_EQUAL(cmp_1.cmp.state.stepSize.value(), -1.0);
+    BOOST_CHECK_EQUAL(cmp_2.cmp.state.stepSize.value(), 1.0);
   }
 }
 
@@ -496,14 +506,15 @@ void test_component_bound_state() {
   // Step forward now
   {
     multi_stepper.updateSurfaceStatus(multi_state, *right_surface, 0,
-                                      Direction::Forward, BoundaryCheck(false));
+                                      Direction::Forward,
+                                      BoundaryTolerance::Infinite());
     auto multi_prop_state = DummyPropState(Direction::Forward, multi_state);
     multi_stepper.step(multi_prop_state, mockNavigator);
 
     // Single stepper
     single_stepper.updateSurfaceStatus(single_state, *right_surface, 0,
                                        Direction::Forward,
-                                       BoundaryCheck(false));
+                                       BoundaryTolerance::Infinite());
     auto single_prop_state = DummyPropState(Direction::Forward, single_state);
     single_stepper.step(single_prop_state, mockNavigator);
   }
@@ -515,17 +526,17 @@ void test_component_bound_state() {
     BOOST_REQUIRE(single_bound_state.ok());
 
     auto cmp_iterable = multi_stepper.componentIterable(multi_state);
+    auto cmp_1 = *cmp_iterable.begin();
+    auto cmp_2 = *(++cmp_iterable.begin());
 
-    auto ok_bound_state =
-        (*cmp_iterable.begin())
-            .boundState(*right_surface, true, FreeToBoundCorrection(false));
-    BOOST_REQUIRE(ok_bound_state.ok());
-    BOOST_CHECK(*single_bound_state == *ok_bound_state);
+    auto bound_state_1 =
+        cmp_1.boundState(*right_surface, true, FreeToBoundCorrection(false));
+    BOOST_REQUIRE(bound_state_1.ok());
+    BOOST_CHECK(*single_bound_state == *bound_state_1);
 
-    auto failed_bound_state =
-        (*(++cmp_iterable.begin()))
-            .boundState(*right_surface, true, FreeToBoundCorrection(false));
-    BOOST_CHECK(!failed_bound_state.ok());
+    auto bound_state_2 =
+        cmp_2.boundState(*right_surface, true, FreeToBoundCorrection(false));
+    BOOST_CHECK(bound_state_2.ok());
   }
 }
 
@@ -723,6 +734,8 @@ void propagator_instatiation_test_function() {
 
   auto surface = Acts::Surface::makeShared<Acts::PlaneSurface>(
       Vector3::Zero(), Vector3{1.0, 0.0, 0.0});
+  using PropagatorOptions =
+      typename Propagator<multi_stepper_t, Navigator>::template Options<>;
   PropagatorOptions options(geoCtx, magCtx);
 
   std::vector<std::tuple<double, BoundVector, std::optional<BoundSquareMatrix>>>

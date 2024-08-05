@@ -1,5 +1,8 @@
 import pandas as pd
+<<<<<<< HEAD
 import numpy as np
+=======
+>>>>>>> upstream/main
 
 import torch.nn as nn
 import torch.nn.functional as F
@@ -14,15 +17,21 @@ def prepareDataSet(data: pd.DataFrame) -> pd.DataFrame:
     @param[in] data: input DataFrame containing 1 event
     @return: Formatted DataFrame 
     """
+<<<<<<< HEAD
     data = data
     data = data.sort_values("good/duplicate/fake", ascending=False)
+=======
+>>>>>>> upstream/main
     # Sort by particle ID
     data = data.sort_values("particleId")
     # Set truth particle ID as index
     data = data.set_index("particleId")
     # Transform the hit list from a string to an actual list
     hitsIds = []
+<<<<<<< HEAD
     mergedIds = []
+=======
+>>>>>>> upstream/main
     for list in data["Hits_ID"].values:
         hitsIds.append(ast.literal_eval(list))
     data["Hits_ID"] = hitsIds
@@ -48,7 +57,11 @@ class DuplicateClassifier(nn.Module):
         z = F.relu(self.linear1(z))
         z = F.relu(self.linear2(z))
         z = F.relu(self.linear3(z))
+<<<<<<< HEAD
         z = F.relu(self.linear4(z))        
+=======
+        z = F.relu(self.linear4(z))
+>>>>>>> upstream/main
         z = F.relu(self.linear5(z))
         return self.sigmoid(self.output(z))
 

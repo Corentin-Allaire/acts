@@ -1,6 +1,9 @@
 import glob
+<<<<<<< HEAD
 import os
 import math
+=======
+>>>>>>> upstream/main
 
 import pandas as pd
 import numpy as np
@@ -10,7 +13,11 @@ import torch.utils
 from sklearn.cluster import DBSCAN, KMeans
 
 from sklearn.preprocessing import LabelEncoder, OrdinalEncoder
+<<<<<<< HEAD
 from seed_solver_network import prepareDataSet, DuplicateClassifier, Normalise
+=======
+from seed_solver_network import prepareDataSet
+>>>>>>> upstream/main
 
 
 def readDataSet(CKS_files: list[str]) -> pd.DataFrame:
@@ -36,7 +43,10 @@ def prepareInferenceData(data: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
     # Remove truth and useless variable
     target_column = "good/duplicate/fake"
     # Separate the truth from the input variables
+<<<<<<< HEAD
 
+=======
+>>>>>>> upstream/main
     y = LabelEncoder().fit(data[target_column]).transform(data[target_column])
     input = data.drop(
         columns=[
@@ -53,7 +63,11 @@ def prepareInferenceData(data: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
 
 
 def clusterSeed(
+<<<<<<< HEAD
     event: pd.DataFrame, DBSCAN_eps: float = 0.1, DBSCAN_min_samples: int = 2
+=======
+    event: pd.DataFrame, DBSCAN_eps: float = 0.03, DBSCAN_min_samples: int = 2
+>>>>>>> upstream/main
 ) -> pd.DataFrame:
     """
     Cluster together all the track that appear to belong to the same truth particle
@@ -82,6 +96,7 @@ def renameCluster(clusterarray: np.ndarray) -> np.ndarray:
     @param[in] clusterarray: numpy array containing the hits IDs and the cluster ID
     @return: numpy array with updated cluster IDs
     """
+<<<<<<< HEAD
     last_id = -1
     new_id = -1
     for i, cluster in enumerate(clusterarray):
@@ -89,6 +104,13 @@ def renameCluster(clusterarray: np.ndarray) -> np.ndarray:
             last_id = cluster
             new_id = new_id + 1
         clusterarray[i] = new_id
+=======
+    new_id = len(set(clusterarray)) - (1 if -1 in clusterarray else 0)
+    for i, cluster in enumerate(clusterarray):
+        if cluster == -1:
+            clusterarray[i] = new_id
+            new_id = new_id + 1
+>>>>>>> upstream/main
     return clusterarray
 
 
@@ -102,14 +124,24 @@ start = time.time()
 CKF_files = sorted(glob.glob("odd_output" + "/event0000000[0-1][0-9]-seed_matched.csv"))
 data = readDataSet(CKF_files)
 
+<<<<<<< HEAD
 # Data of each events after clustering
 clusteredData = []
 # data of each events after ambiguity resolution
+=======
+# Data of each event after clustering
+clusteredData = []
+# Data of each event after ambiguity resolution
+>>>>>>> upstream/main
 cleanedData = []
 
 t1 = time.time()
 
+<<<<<<< HEAD
 # Cluster togather tracks belonging to the same particle
+=======
+# Cluster tracks belonging to the same particle
+>>>>>>> upstream/main
 for event in data:
     clustered = clusterSeed(event)
     clusteredData.append(clustered)
@@ -152,8 +184,20 @@ plt.ylabel("nb seed")
 plt.savefig("pT.png")
 plt.clf()
 
+<<<<<<< HEAD
 plotDF2 = pd.DataFrame()
 # Create histogram filled with the number of seed per cluster
+=======
+plotDF.plot.scatter(x="eta", y="pT")
+plt.xlabel("eta")
+plt.ylabel("pT")
+plt.savefig("pT_eta.png")
+plt.clf()
+
+
+plotDF2 = pd.DataFrame()
+# Create histogram filled with the number of seeds per cluster
+>>>>>>> upstream/main
 for event in plotData:
     event["nb_seed"] = 0
     event["nb_fake"] = 0
@@ -165,20 +209,32 @@ for event in plotData:
     event["nb_seed_removed"] = 0
     event["particleId"] = event.index
     event["nb_seed"] = event.groupby(["cluster"])["cluster"].transform("size")
+<<<<<<< HEAD
     event["nb_seed"] = event.groupby(["cluster"])["cluster"].transform("size")
     # Create histogram filled with the number of fake seed per cluster
+=======
+    # Create histogram filled with the number of fake seeds per cluster
+>>>>>>> upstream/main
     event.loc[event["good/duplicate/fake"] == "fake", "nb_fake"] = (
         event.loc[event["good/duplicate/fake"] == "fake"]
         .groupby(["cluster"])["cluster"]
         .transform("size")
     )
+<<<<<<< HEAD
     # Create histogram filled with the number of duplicate seed per cluster
+=======
+    # Create histogram filled with the number of duplicate seeds per cluster
+>>>>>>> upstream/main
     event.loc[event["good/duplicate/fake"] == "duplicate", "nb_duplicate"] = (
         event.loc[event["good/duplicate/fake"] == "duplicate"]
         .groupby(["cluster"])["cluster"]
         .transform("size")
     )
+<<<<<<< HEAD
     # Create histogram filled with the number of good seed per cluster
+=======
+    # Create histogram filled with the number of good seeds per cluster
+>>>>>>> upstream/main
     event.loc[event["good/duplicate/fake"] == "good", "nb_good"] = (
         event.loc[event["good/duplicate/fake"] == "good"]
         .groupby(["cluster"])["cluster"]
@@ -225,17 +281,32 @@ for clusteredEvent in clusteredData:
 
     clusteredEvent["score"] = output_predict
     # Keep only the track in cluster of more than 1 track or with a score above 0.5
+<<<<<<< HEAD
     idx = (clusteredEvent["score"] > 0.0) | (
         clusteredEvent.groupby(["cluster"])["cluster"].transform("size") > 3
     )
     cleanedEvent = clusteredEvent[idx]
 
     # For each cluster only keep the track with the highest score
+=======
+    idx = clusteredEvent["score"] > 0.1
+    cleanedEvent = clusteredEvent[idx]
+    # For each cluster only keep the seed with the highest score
+>>>>>>> upstream/main
     idx = (
         cleanedEvent.groupby(["cluster"])["score"].transform(max)
         == cleanedEvent["score"]
     )
     cleanedEvent = cleanedEvent[idx]
+<<<<<<< HEAD
+=======
+    # For cluster with more than 1 seed, keep the one with the smallest seed_id
+    idx = (
+        cleanedEvent.groupby(["cluster"])["seed_id"].transform(min)
+        == cleanedEvent["seed_id"]
+    )
+    cleanedEvent = cleanedEvent[idx]
+>>>>>>> upstream/main
     cleanedData.append(cleanedEvent)
 
 t4 = time.time()
@@ -281,18 +352,32 @@ for clusteredEvent, cleanedEvent in zip(clusteredData, cleanedData):
 tend = time.time()
 
 print("===Initial efficiencies===")
+<<<<<<< HEAD
 print("nb particles : ", nb_part)
 print("nb track : ", nb_track)
+=======
+print("nb particles: ", nb_part)
+print("nb track: ", nb_track)
+>>>>>>> upstream/main
 print("duplicate rate: ", 100 * nb_duplicate / nb_track, " %")
 print("Fake rate: ", 100 * nb_fake / nb_track, " %")
 
 print("===computed efficiencies===")
+<<<<<<< HEAD
 print("nb particles : ", nb_part)
 print("nb good match : ", nb_good_match)
 print("nb particle reco : ", nb_reco_part)
 print("nb track reco : ", nb_reco_track)
 print("Efficiency (good track) : ", 100 * nb_good_match / nb_part, " %")
 print("Efficiency (particle reco) : ", 100 * nb_reco_part / nb_part, " %")
+=======
+print("nb particles: ", nb_part)
+print("nb good match: ", nb_good_match)
+print("nb particle reco: ", nb_reco_part)
+print("nb track reco: ", nb_reco_track)
+print("Efficiency (good track): ", 100 * nb_good_match / nb_part, " %")
+print("Efficiency (particle reco): ", 100 * nb_reco_part / nb_part, " %")
+>>>>>>> upstream/main
 print(
     "duplicate rate: ",
     100 * ((nb_good_match + nb_reco_duplicate) - nb_reco_part) / nb_reco_track,
@@ -301,18 +386,31 @@ print(
 print("Fake rate: ", 100 * nb_reco_fake / nb_reco_track, " %")
 
 print("===computed speed===")
+<<<<<<< HEAD
 print("Load : ", (t1 - start) * 1000 / len(CKF_files), "ms")
 print("Clustering : ", (t2 - t1) * 1000 / len(CKF_files), "ms")
 print("Inference : ", (t4 - t3) * 1000 / len(CKF_files), "ms")
 print("Perf : ", (tend - t4) * 1000 / len(CKF_files), "ms")
 print("tot : ", (t4 - start) * 1000 / len(CKF_files), "ms")
 print("Seed filter : ", (t4 - t1) * 1000 / len(CKF_files), "ms")
+=======
+print("Load: ", (t1 - start) * 1000 / len(CKF_files), "ms")
+print("Clustering: ", (t2 - t1) * 1000 / len(CKF_files), "ms")
+print("Inference: ", (t4 - t3) * 1000 / len(CKF_files), "ms")
+print("Perf: ", (tend - t4) * 1000 / len(CKF_files), "ms")
+print("tot: ", (t4 - start) * 1000 / len(CKF_files), "ms")
+print("Seed filter: ", (t4 - t1) * 1000 / len(CKF_files), "ms")
+>>>>>>> upstream/main
 
 
 # ==================================================================
 # Plotting
 
+<<<<<<< HEAD
 # Combine the events together to have a better statistics
+=======
+# Combine the events to have a better statistic
+>>>>>>> upstream/main
 clusteredDataPlots = pd.concat(clusteredData)
 
 cleanedDataPlots = pd.concat(cleanedData)
@@ -321,6 +419,7 @@ cleanedDataPlots = pd.concat(cleanedData)
 import matplotlib.pyplot as plt
 
 # Plot the average score distribution for each type of track
+<<<<<<< HEAD
 
 plt.figure()
 plt.hist(
@@ -347,6 +446,31 @@ plt.title("Score distribution for each type of track")
 plt.savefig("score_distribution.png")
 
 # Average value of the score for 50 eta bins
+=======
+plt.figure()
+for tag in ["good", "duplicate", "fake"]:
+    weights = np.ones_like(
+        cleanedDataPlots.loc[cleanedDataPlots["good/duplicate/fake"] == tag]["score"]
+    ) / len(
+        cleanedDataPlots.loc[cleanedDataPlots["good/duplicate/fake"] == tag]["score"]
+    )
+    plt.hist(
+        cleanedDataPlots.loc[cleanedDataPlots["good/duplicate/fake"] == tag]["score"],
+        bins=100,
+        weights=weights,
+        alpha=0.65,
+        label=tag,
+    )
+plt.legend()
+plt.xlabel("score")
+plt.ylabel("Fraction of good/duplicate/fake tracks")
+plt.title("Score distribution for each type of track")
+plt.savefig("score_distribution.png")
+plt.yscale("log")
+plt.savefig("score_distribution_log.png")
+
+# Average value of the score
+>>>>>>> upstream/main
 averageCleanedDataPlots = cleanedDataPlots.loc[
     cleanedDataPlots["good/duplicate/fake"] == "good"
 ].groupby(
@@ -393,6 +517,35 @@ plt.yscale("log")
 plt.title("pT distribution for each type of track")
 plt.savefig("pT_distribution.png")
 
+<<<<<<< HEAD
+=======
+# Plot the eta distribution for each type of track
+plt.figure()
+plt.hist(
+    [
+        clusteredDataPlots.loc[clusteredDataPlots["good/duplicate/fake"] == "good"][
+            "eta"
+        ],
+        clusteredDataPlots.loc[
+            clusteredDataPlots["good/duplicate/fake"] == "duplicate"
+        ]["eta"],
+        clusteredDataPlots.loc[clusteredDataPlots["good/duplicate/fake"] == "fake"][
+            "eta"
+        ],
+    ],
+    bins=100,
+    range=(-3, 3),
+    stacked=False,
+    label=["good", "duplicate", "fake"],
+)
+plt.legend()
+plt.xlabel("eta")
+plt.ylabel("number of tracks")
+plt.yscale("log")
+plt.title("eta distribution for each type of track")
+plt.savefig("eta_distribution.png")
+
+>>>>>>> upstream/main
 # Average value of the score for 50 pt bins
 averageCleanedDataPlots = cleanedDataPlots.loc[
     cleanedDataPlots["good/duplicate/fake"] == "good"

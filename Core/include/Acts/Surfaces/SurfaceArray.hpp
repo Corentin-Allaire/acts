@@ -10,10 +10,10 @@
 #include "Acts/Definitions/Algebra.hpp"
 #include "Acts/Geometry/GeometryContext.hpp"
 #include "Acts/Surfaces/Surface.hpp"
+#include "Acts/Utilities/Axis.hpp"
 #include "Acts/Utilities/BinningType.hpp"
 #include "Acts/Utilities/Grid.hpp"
 #include "Acts/Utilities/IAxis.hpp"
-#include "Acts/Utilities/detail/Axis.hpp"
 
 #include <iostream>
 #include <type_traits>
@@ -159,7 +159,7 @@ class SurfaceArray {
     void fill(const GeometryContext& gctx,
               const SurfaceVector& surfaces) override {
       for (const auto& srf : surfaces) {
-        Vector3 pos = srf->binningPosition(gctx, binR);
+        Vector3 pos = srf->binningPosition(gctx, BinningValue::binR);
         lookup(pos).push_back(srf);
       }
 
@@ -194,7 +194,8 @@ class SurfaceArray {
         Vector3 binCtr = getBinCenter(b);
         minPath = std::numeric_limits<double>::max();
         for (const auto& srf : surfaces) {
-          curPath = (binCtr - srf->binningPosition(gctx, binR)).norm();
+          curPath =
+              (binCtr - srf->binningPosition(gctx, BinningValue::binR)).norm();
 
           if (curPath < minPath) {
             minPath = curPath;
@@ -361,42 +362,30 @@ class SurfaceArray {
     SingleElementLookup(const SurfaceVector& elements) : m_element(elements) {}
 
     /// @brief Lookup, always returns @c element
-    /// @param position is ignored
     /// @return reference to vector containing only @c element
-    SurfaceVector& lookup(const Vector3& position) override {
-      (void)position;
+    SurfaceVector& lookup(const Vector3& /*position*/) override {
       return m_element;
     }
 
     /// @brief Lookup, always returns @c element
-    /// @param position is ignored
     /// @return reference to vector containing only @c element
-    const SurfaceVector& lookup(const Vector3& position) const override {
-      (void)position;
+    const SurfaceVector& lookup(const Vector3& /*position*/) const override {
       return m_element;
     }
 
     /// @brief Lookup, always returns @c element
-    /// @param bin is ignored
     /// @return reference to vector containing only @c element
-    SurfaceVector& lookup(std::size_t bin) override {
-      (void)bin;
+    SurfaceVector& lookup(std::size_t /*bin*/) override { return m_element; }
+
+    /// @brief Lookup, always returns @c element
+    /// @return reference to vector containing only @c element
+    const SurfaceVector& lookup(std::size_t /*bin*/) const override {
       return m_element;
     }
 
     /// @brief Lookup, always returns @c element
-    /// @param bin is ignored
     /// @return reference to vector containing only @c element
-    const SurfaceVector& lookup(std::size_t bin) const override {
-      (void)bin;
-      return m_element;
-    }
-
-    /// @brief Lookup, always returns @c element
-    /// @param position is ignored
-    /// @return reference to vector containing only @c element
-    const SurfaceVector& neighbors(const Vector3& position) const override {
-      (void)position;
+    const SurfaceVector& neighbors(const Vector3& /*position*/) const override {
       return m_element;
     }
 
@@ -405,10 +394,8 @@ class SurfaceArray {
     std::size_t size() const override { return 1; }
 
     /// @brief Gets the bin center, but always returns (0, 0, 0)
-    /// @param bin is ignored
     /// @return (0, 0, 0)
-    Vector3 getBinCenter(std::size_t bin) const override {
-      (void)bin;
+    Vector3 getBinCenter(std::size_t /*bin*/) const override {
       return Vector3(0, 0, 0);
     }
 
@@ -433,12 +420,8 @@ class SurfaceArray {
     }
 
     /// @brief Returns if the bin is valid (it is)
-    /// @param bin is ignored
     /// @return always true
-    bool isValidBin(std::size_t bin) const override {
-      (void)bin;
-      return true;
-    }
+    bool isValidBin(std::size_t /*bin*/) const override { return true; }
 
    private:
     SurfaceVector m_element;

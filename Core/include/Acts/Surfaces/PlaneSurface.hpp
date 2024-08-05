@@ -12,11 +12,12 @@
 #include "Acts/Definitions/Tolerance.hpp"
 #include "Acts/Geometry/GeometryContext.hpp"
 #include "Acts/Geometry/Polyhedron.hpp"
-#include "Acts/Surfaces/BoundaryCheck.hpp"
+#include "Acts/Surfaces/BoundaryTolerance.hpp"
 #include "Acts/Surfaces/InfiniteBounds.hpp"
 #include "Acts/Surfaces/PlanarBounds.hpp"
 #include "Acts/Surfaces/RegularSurface.hpp"
 #include "Acts/Surfaces/Surface.hpp"
+#include "Acts/Surfaces/SurfaceConcept.hpp"
 #include "Acts/Utilities/BinningType.hpp"
 #include "Acts/Utilities/Result.hpp"
 
@@ -57,6 +58,8 @@ class PlaneSurface : public RegularSurface {
   PlaneSurface(const GeometryContext& gctx, const PlaneSurface& other,
                const Transform3& transform);
 
+  /// @deprecated Use `CurvilinearSurface` instead
+  ///
   /// Dedicated Constructor with normal vector
   /// This is for curvilinear surfaces which are by definition boundless
   ///
@@ -173,7 +176,7 @@ class PlaneSurface : public RegularSurface {
   /// @param position The start position of the intersection attempt
   /// @param direction The direction of the intersection attempt,
   /// (@note expected to be normalized)
-  /// @param bcheck The boundary check directive
+  /// @param boundaryTolerance The boundary check directive
   /// @param tolerance the tolerance used for the intersection
   ///
   /// <b>mathematical motivation:</b>
@@ -197,7 +200,8 @@ class PlaneSurface : public RegularSurface {
   SurfaceMultiIntersection intersect(
       const GeometryContext& gctx, const Vector3& position,
       const Vector3& direction,
-      const BoundaryCheck& bcheck = BoundaryCheck(false),
+      const BoundaryTolerance& boundaryTolerance =
+          BoundaryTolerance::Infinite(),
       ActsScalar tolerance = s_onSurfaceTolerance) const final;
 
   /// Return a Polyhedron for the surfaces
@@ -232,4 +236,7 @@ class PlaneSurface : public RegularSurface {
  private:
 };
 
-}  // end of namespace Acts
+static_assert(RegularSurfaceConcept<PlaneSurface>,
+              "PlaneSurface does not fulfill RegularSurfaceConcept");
+
+}  // namespace Acts

@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "Acts/Plugins/Podio/PodioUtil.hpp"
 #include "ActsExamples/EventData/Track.hpp"
 #include "ActsExamples/EventData/Trajectories.hpp"
 #include "ActsExamples/Framework/DataHandle.hpp"
@@ -18,7 +19,7 @@
 
 #include <string>
 
-#include <podio/ROOTFrameReader.h>
+#include <tbb/enumerable_thread_specific.h>
 
 namespace ActsExamples {
 
@@ -54,11 +55,15 @@ class EDM4hepTrackReader : public IReader {
   ProcessCode read(const ActsExamples::AlgorithmContext& ctx) final;
 
  private:
+  std::pair<std::size_t, std::size_t> m_eventsRange;
+
   Config m_cfg;
 
   WriteDataHandle<ConstTrackContainer> m_outputTracks{this, "OutputTracks"};
 
-  podio::ROOTFrameReader m_reader;
+  tbb::enumerable_thread_specific<Acts::PodioUtil::ROOTReader> m_reader;
+
+  Acts::PodioUtil::ROOTReader& reader();
 
   std::unique_ptr<const Acts::Logger> m_logger;
 

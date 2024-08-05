@@ -1,6 +1,6 @@
 // This file is part of the Acts project.
 //
-// Copyright (C) 2022 CERN for the benefit of the Acts project
+// Copyright (C) 2022-2024 CERN for the benefit of the Acts project
 //
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -14,7 +14,7 @@
 #include "Acts/EventData/SourceLink.hpp"
 #include "Acts/EventData/TrackStatePropMask.hpp"
 #include "Acts/EventData/detail/DynamicColumn.hpp"
-#include "Acts/Utilities/Concepts.hpp"
+#include "Acts/EventData/detail/DynamicKeyIterator.hpp"
 #include "Acts/Utilities/HashedString.hpp"
 #include "Acts/Utilities/Helpers.hpp"
 #include "Acts/Utilities/ThrowAssert.hpp"
@@ -27,6 +27,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -151,7 +152,7 @@ class VectorMultiTrajectoryBase {
     IndexType ijacobian = kInvalid;
     IndexType iprojector = kInvalid;
 
-    double chi2 = 0;
+    float chi2 = 0;
     double pathLength = 0;
     TrackStateType::raw_type typeFlags{};
 
@@ -181,6 +182,7 @@ class VectorMultiTrajectoryBase {
     for (const auto& [key, value] : other.m_dynamic) {
       m_dynamic.insert({key, value->clone()});
     }
+    m_dynamicKeys = other.m_dynamicKeys;
   };
 
   VectorMultiTrajectoryBase(VectorMultiTrajectoryBase&& other) = default;
@@ -264,7 +266,7 @@ class VectorMultiTrajectoryBase {
   }
 
   template <typename T>
-  static constexpr bool hasColumn_impl(T& instance, HashedString key) {
+  static bool hasColumn_impl(T& instance, HashedString key) {
     using namespace Acts::HashedStringLiteral;
     switch (key) {
       case "predicted"_hash:
@@ -288,6 +290,11 @@ class VectorMultiTrajectoryBase {
     }
   }
 
+ public:
+  detail::DynamicKeyRange<detail::DynamicColumnBase> dynamicKeys_impl() const {
+    return {m_dynamic.begin(), m_dynamic.end()};
+  }
+
   // END INTERFACE HELPER
 
  public:
@@ -308,15 +315,16 @@ class VectorMultiTrajectoryBase {
   std::vector<IndexData> m_index;
   std::vector<IndexType> m_previous;
   std::vector<IndexType> m_next;
-  std::vector<typename detail_lt::Types<eBoundSize>::Coefficients> m_params;
-  std::vector<typename detail_lt::Types<eBoundSize>::Covariance> m_cov;
+  std::vector<typename detail_lt::FixedSizeTypes<eBoundSize>::Coefficients>
+      m_params;
+  std::vector<typename detail_lt::FixedSizeTypes<eBoundSize>::Covariance> m_cov;
 
   std::vector<double> m_meas;
   std::vector<MultiTrajectoryTraits::IndexType> m_measOffset;
   std::vector<double> m_measCov;
   std::vector<MultiTrajectoryTraits::IndexType> m_measCovOffset;
 
-  std::vector<typename detail_lt::Types<eBoundSize>::Covariance> m_jac;
+  std::vector<typename detail_lt::FixedSizeTypes<eBoundSize>::Covariance> m_jac;
   std::vector<std::optional<SourceLink>> m_sourceLinks;
   std::vector<ProjectorBitset> m_projectors;
 
@@ -327,6 +335,7 @@ class VectorMultiTrajectoryBase {
   // be handled in a smart way by moving but not sure.
   std::vector<std::shared_ptr<const Surface>> m_referenceSurfaces;
 
+  std::vector<HashedString> m_dynamicKeys;
   std::unordered_map<HashedString, std::unique_ptr<detail::DynamicColumnBase>>
       m_dynamic;
 };
@@ -385,36 +394,38 @@ class VectorMultiTrajectory final
   }
 
   template <std::size_t measdim>
-  TrackStateProxy::Measurement<measdim> measurement_impl(IndexType istate) {
+  TrackStateProxy::Calibrated<measdim> calibrated_impl(IndexType istate) {
     IndexType offset = m_measOffset[istate];
-    return TrackStateProxy::Measurement<measdim>{&m_meas[offset]};
+    return TrackStateProxy::Calibrated<measdim>{&m_meas[offset]};
   }
 
   template <std::size_t measdim>
-  ConstTrackStateProxy::Measurement<measdim> measurement_impl(
+  ConstTrackStateProxy::Calibrated<measdim> calibrated_impl(
       IndexType istate) const {
     IndexType offset = m_measOffset[istate];
-    return ConstTrackStateProxy::Measurement<measdim>{&m_meas[offset]};
+    return ConstTrackStateProxy::Calibrated<measdim>{&m_meas[offset]};
   }
 
   template <std::size_t measdim>
-  TrackStateProxy::MeasurementCovariance<measdim> measurementCovariance_impl(
+  TrackStateProxy::CalibratedCovariance<measdim> calibratedCovariance_impl(
       IndexType istate) {
     IndexType offset = m_measCovOffset[istate];
-    return TrackStateProxy::MeasurementCovariance<measdim>{&m_measCov[offset]};
+    return TrackStateProxy::CalibratedCovariance<measdim>{&m_measCov[offset]};
   }
 
   template <std::size_t measdim>
-  ConstTrackStateProxy::MeasurementCovariance<measdim>
-  measurementCovariance_impl(IndexType istate) const {
+  ConstTrackStateProxy::CalibratedCovariance<measdim> calibratedCovariance_impl(
+      IndexType istate) const {
     IndexType offset = m_measCovOffset[istate];
-    return ConstTrackStateProxy::MeasurementCovariance<measdim>{
+    return ConstTrackStateProxy::CalibratedCovariance<measdim>{
         &m_measCov[offset]};
   }
 
   IndexType addTrackState_impl(
       TrackStatePropMask mask = TrackStatePropMask::All,
       IndexType iprevious = kInvalid);
+
+  void addTrackStateComponents_impl(IndexType istate, TrackStatePropMask mask);
 
   void reserve(std::size_t n);
 
@@ -424,7 +435,7 @@ class VectorMultiTrajectory final
 
   void unset_impl(TrackStatePropMask target, IndexType istate);
 
-  constexpr bool has_impl(HashedString key, IndexType istate) const {
+  bool has_impl(HashedString key, IndexType istate) const {
     return detail_vmt::VectorMultiTrajectoryBase::has_impl(*this, key, istate);
   }
 
@@ -445,12 +456,12 @@ class VectorMultiTrajectory final
   }
 
   template <typename T>
-  constexpr void addColumn_impl(const std::string& key) {
-    m_dynamic.insert(
-        {hashString(key), std::make_unique<detail::DynamicColumn<T>>()});
+  void addColumn_impl(std::string_view key) {
+    HashedString hashedKey = hashString(key);
+    m_dynamic.insert({hashedKey, std::make_unique<detail::DynamicColumn<T>>()});
   }
 
-  constexpr bool hasColumn_impl(HashedString key) const {
+  bool hasColumn_impl(HashedString key) const {
     return detail_vmt::VectorMultiTrajectoryBase::hasColumn_impl(*this, key);
   }
 
@@ -482,10 +493,15 @@ class VectorMultiTrajectory final
     m_referenceSurfaces[istate] = std::move(surface);
   }
 
+  void copyDynamicFrom_impl(IndexType dstIdx, HashedString key,
+                            const std::any& srcPtr);
+
   // END INTERFACE
 };
 
-ACTS_STATIC_CHECK_CONCEPT(MutableMultiTrajectoryBackend, VectorMultiTrajectory);
+static_assert(
+    MutableMultiTrajectoryBackend<VectorMultiTrajectory>,
+    "VectorMultiTrajectory does not fulfill MutableMultiTrajectoryBackend");
 
 class ConstVectorMultiTrajectory;
 
@@ -534,21 +550,21 @@ class ConstVectorMultiTrajectory final
   }
 
   template <std::size_t measdim>
-  ConstTrackStateProxy::Measurement<measdim> measurement_impl(
+  ConstTrackStateProxy::Calibrated<measdim> calibrated_impl(
       IndexType istate) const {
     IndexType offset = m_measOffset[istate];
-    return ConstTrackStateProxy::Measurement<measdim>{&m_meas[offset]};
+    return ConstTrackStateProxy::Calibrated<measdim>{&m_meas[offset]};
   }
 
   template <std::size_t measdim>
-  ConstTrackStateProxy::MeasurementCovariance<measdim>
-  measurementCovariance_impl(IndexType istate) const {
+  ConstTrackStateProxy::CalibratedCovariance<measdim> calibratedCovariance_impl(
+      IndexType istate) const {
     IndexType offset = m_measCovOffset[istate];
-    return ConstTrackStateProxy::MeasurementCovariance<measdim>{
+    return ConstTrackStateProxy::CalibratedCovariance<measdim>{
         &m_measCov[offset]};
   }
 
-  constexpr bool has_impl(HashedString key, IndexType istate) const {
+  bool has_impl(HashedString key, IndexType istate) const {
     return detail_vmt::VectorMultiTrajectoryBase::has_impl(*this, key, istate);
   }
 
@@ -561,14 +577,15 @@ class ConstVectorMultiTrajectory final
         *this, key, istate);
   }
 
-  constexpr bool hasColumn_impl(HashedString key) const {
+  bool hasColumn_impl(HashedString key) const {
     return detail_vmt::VectorMultiTrajectoryBase::hasColumn_impl(*this, key);
   }
 
   // END INTERFACE
 };
 
-ACTS_STATIC_CHECK_CONCEPT(ConstMultiTrajectoryBackend,
-                          ConstVectorMultiTrajectory);
+static_assert(
+    ConstMultiTrajectoryBackend<ConstVectorMultiTrajectory>,
+    "ConctVectorMultiTrajectory does not fulfill ConstMultiTrajectoryBackend");
 
 }  // namespace Acts

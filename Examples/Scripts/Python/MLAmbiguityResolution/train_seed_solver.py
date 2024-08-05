@@ -16,8 +16,13 @@ from seed_solver_network import (
     Normalise,
 )
 
+<<<<<<< HEAD
 avg_mean = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 avg_sdv = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+=======
+avg_mean = [0] * 14
+avg_sdv = [0] * 14
+>>>>>>> upstream/main
 events = 0
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -28,7 +33,10 @@ def readDataSet(Seed_files: list[str]) -> pd.DataFrame:
     @param[in] Seed_files: DataFrame contain the data from each seed files (1 file per events usually)
     @return: combined DataFrame containing all the seed, ordered by events and then by truth particle ID in each events 
     """
+<<<<<<< HEAD
     globalindex = 0
+=======
+>>>>>>> upstream/main
     data = pd.DataFrame()
     for f in Seed_files:
         datafile = pd.read_csv(f)
@@ -124,7 +132,11 @@ def computeLoss(
                 len(score_duplicate) + len(score_fake) + 1
             )
     batch_loss += margin_fake / (len(score_duplicate) + len(score_fake) + 1)
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> upstream/main
     return batch_loss
 
 
@@ -197,7 +209,11 @@ def scoringBatch(batch: list[pd.DataFrame], Optimiser=0) -> tuple[int, int, floa
                 score_duplicate.append(pred)
             else:
                 score_fake.append(pred)
+<<<<<<< HEAD
             # Prepare efficiency computtion
+=======
+            # Prepare efficiency computation
+>>>>>>> upstream/main
             if pred > max_score:
                 max_score = pred
                 max_match = truth
@@ -217,7 +233,11 @@ def scoringBatch(batch: list[pd.DataFrame], Optimiser=0) -> tuple[int, int, floa
         nb_part += 1
         # Normalise the loss to the batch size
         batch_loss = batch_loss / len(b_data[0])
+<<<<<<< HEAD
         loss += batch_loss
+=======
+        loss += batch_loss.item()
+>>>>>>> upstream/main
         # Perform the gradient descent if an optimiser was specified
         if Optimiser:
             batch_loss.backward()
@@ -251,7 +271,11 @@ def train(
     val_batch = int(len(batch) * (1 - validation))
     # Loop over all the epoch
     for epoch in range(epochs):
+<<<<<<< HEAD
         print("Epoch : ", epoch, " / ", epochs)
+=======
+        print("Epoch: ", epoch, " / ", epochs)
+>>>>>>> upstream/main
         loss = 0.0
         nb_part = 0.0
         nb_good_match = 0.0
@@ -261,11 +285,19 @@ def train(
             batch[:val_batch], Optimiser=opt
         )
         print(
+<<<<<<< HEAD
             "Loss/train : ",
             loss,
             " Eff/train : ",
             nb_good_match / nb_part,
             " Eff_best/train : ",
+=======
+            "Loss/train: ",
+            loss,
+            " Eff/train: ",
+            nb_good_match / nb_part,
+            " Eff_best/train: ",
+>>>>>>> upstream/main
             nb_best_match / nb_part,
         )
         writer.add_scalar("Loss/train", loss, epoch)
@@ -281,11 +313,19 @@ def train(
             writer.add_scalar("Eff/val", nb_good_match / nb_part, epoch)
             writer.add_scalar("Eff_best/train", nb_best_match / nb_part, epoch)
             print(
+<<<<<<< HEAD
                 "Loss/val : ",
                 loss,
                 " Eff/val : ",
                 nb_good_match / nb_part,
                 " Eff_best/val : ",
+=======
+                "Loss/val: ",
+                loss,
+                " Eff/val: ",
+                nb_good_match / nb_part,
+                " Eff_best/val: ",
+>>>>>>> upstream/main
                 nb_best_match / nb_part,
             )
 
@@ -295,8 +335,15 @@ def train(
 
 # ==================================================================
 
+<<<<<<< HEAD
 # ttbar events used as the training input, here we assume 160 events are availables
 CKF_files = sorted(glob.glob("odd_output" + "/event000000[0-9][0-9][0-9]-seed_cleaned.csv"))
+=======
+# ttbar events used as the training input, here we assume 1000 events are available
+CKF_files = sorted(
+    glob.glob("odd_output" + "/event000000[0-9][0-9][0-9]-seed_cleaned.csv")
+)
+>>>>>>> upstream/main
 data = readDataSet(CKF_files)
 # Prepare the data
 x_train, y_train = prepareTrainingData(data)
@@ -306,7 +353,11 @@ avg_sdv = [x / events for x in avg_sdv]
 
 # Create our model and chose the layers sizes
 input_dim = np.shape(x_train)[1]
+<<<<<<< HEAD
 layers_dim = [80, 100, 80]
+=======
+layers_dim = [80, 80, 100, 80, 80]
+>>>>>>> upstream/main
 
 duplicateClassifier = nn.Sequential(
     Normalise(avg_mean, avg_sdv), DuplicateClassifier(input_dim, layers_dim)
@@ -321,7 +372,11 @@ input_test = torch.tensor(x_train, dtype=torch.float32)
 torch.save(duplicateClassifier, "seedduplicateClassifier.pt")
 torch.onnx.export(
     duplicateClassifier,
+<<<<<<< HEAD
     input_test,
+=======
+    input_test[0:1],
+>>>>>>> upstream/main
     "seedduplicateClassifier.onnx",
     input_names=["x"],
     output_names=["y"],
@@ -336,7 +391,13 @@ del duplicateClassifier
 # ==================================================================
 
 # ttbar events for the test, here we assume 40 events are availables
+<<<<<<< HEAD
 CKF_files_test = sorted(glob.glob("odd_output" + "/event000001[0-0][0-9][0-9]-seed_cleaned.csv"))
+=======
+CKF_files_test = sorted(
+    glob.glob("odd_output" + "/event000001[0-0][0-9][0-9]-seed_cleaned.csv")
+)
+>>>>>>> upstream/main
 
 test = readDataSet(CKF_files_test)
 
@@ -370,10 +431,15 @@ max_score = 0
 # Compute the efficiency
 for index, pred, truth in zip(test.index, output_predict, y_test):
     if index != pid:
+<<<<<<< HEAD
+=======
+        nb_part += 1
+>>>>>>> upstream/main
         if max_match == 0 or max_match == 2:
             nb_good_match += 1
         if max_match == 2:
             nb_best_match += 1
+<<<<<<< HEAD
 
 nb_part += 1
 if max_match == 0 or max_match == 2:
@@ -388,5 +454,18 @@ best_match_bucket = 0
 print("nb particles : ", nb_part)
 print("nb good match : ", nb_good_match)
 print("nb best match : ", nb_best_match)
+=======
+        pid = index
+        max_match = 1
+        max_score = 0
+
+    if pred > max_score:
+        max_score = pred
+        max_match = truth
+
+print("nb particles: ", nb_part)
+print("nb good match: ", nb_good_match)
+print("nb best match: ", nb_best_match)
+>>>>>>> upstream/main
 print("Efficiency: ", 100 * nb_good_match / nb_part, " %")
 print("Efficiency_best: ", 100 * nb_best_match / nb_part, " %")

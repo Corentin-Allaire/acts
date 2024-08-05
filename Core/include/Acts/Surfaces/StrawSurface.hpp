@@ -13,6 +13,7 @@
 #include "Acts/Surfaces/LineBounds.hpp"
 #include "Acts/Surfaces/LineSurface.hpp"
 #include "Acts/Surfaces/Surface.hpp"
+#include "Acts/Surfaces/SurfaceConcept.hpp"
 
 #include <cstddef>
 #include <memory>
@@ -107,5 +108,8 @@ inline Surface::SurfaceType StrawSurface::type() const {
 inline std::string Acts::StrawSurface::name() const {
   return "Acts::StrawSurface";
 }
+
+static_assert(SurfaceConcept<StrawSurface>,
+              "StrawSurface does not fulfill SurfaceConcept");
 
 }  // namespace Acts

@@ -10,7 +10,6 @@
 
 #include "Acts/Detector/DetectorVolume.hpp"
 #include "Acts/Detector/Portal.hpp"
-#include "Acts/Geometry/AbstractVolume.hpp"
 #include "Acts/Geometry/BoundarySurfaceT.hpp"
 #include "Acts/Geometry/CylinderVolumeBounds.hpp"
 #include "Acts/Geometry/Extent.hpp"
@@ -18,6 +17,7 @@
 #include "Acts/Geometry/Layer.hpp"
 #include "Acts/Geometry/Polyhedron.hpp"
 #include "Acts/Geometry/TrackingVolume.hpp"
+#include "Acts/Geometry/Volume.hpp"
 #include "Acts/Surfaces/ConeBounds.hpp"
 #include "Acts/Surfaces/ConeSurface.hpp"
 #include "Acts/Surfaces/CylinderBounds.hpp"
@@ -64,15 +64,13 @@ std::string getWorkingDirectory() {
 
 }  // namespace
 
-namespace Acts {
-namespace Experimental {
+namespace Acts::Experimental {
 ViewConfig s_viewSensitive = ViewConfig({0, 180, 240});
 ViewConfig s_viewPassive = ViewConfig({240, 280, 0});
 ViewConfig s_viewVolume = ViewConfig({220, 220, 0});
 ViewConfig s_viewGrid = ViewConfig({220, 0, 0});
 ViewConfig s_viewLine = ViewConfig({0, 0, 220});
-}  // namespace Experimental
-}  // namespace Acts
+}  // namespace Acts::Experimental
 
 void Acts::GeometryView3D::drawPolyhedron(IVisualization3D& helper,
                                           const Polyhedron& polyhedron,
@@ -129,8 +127,9 @@ void Acts::GeometryView3D::drawSurfaceArray(
   auto axes = surfaceArray.getAxes();
   if (!binning.empty() && binning.size() == 2 && axes.size() == 2) {
     // Cylinder surface array
-    if (binning[0] == binPhi && binning[1] == binZ) {
-      double R = arrayExtent.medium(binR) + gridConfig.offset;
+    if (binning[0] == BinningValue::binPhi &&
+        binning[1] == BinningValue::binZ) {
+      double R = arrayExtent.medium(BinningValue::binR) + gridConfig.offset;
       auto phiValues = axes[0]->getBinEdges();
       auto zValues = axes[1]->getBinEdges();
       ViewConfig gridRadConfig = gridConfig;
@@ -148,13 +147,14 @@ void Acts::GeometryView3D::drawSurfaceArray(
       auto cvbOrientedSurfaces = cvb.orientedSurfaces();
       for (auto z : zValues) {
         for (const auto& cvbSf : cvbOrientedSurfaces) {
-          drawSurface(helper, *cvbSf.first, gctx,
+          drawSurface(helper, *cvbSf.surface, gctx,
                       Translation3(0., 0., z) * transform, gridRadConfig);
         }
       }
 
-    } else if (binning[0] == binR && binning[1] == binPhi) {
-      double z = arrayExtent.medium(binZ) + gridConfig.offset;
+    } else if (binning[0] == BinningValue::binR &&
+               binning[1] == BinningValue::binPhi) {
+      double z = arrayExtent.medium(BinningValue::binZ) + gridConfig.offset;
       auto rValues = axes[0]->getBinEdges();
       auto phiValues = axes[1]->getBinEdges();
       ViewConfig gridRadConfig = gridConfig;
@@ -164,7 +164,7 @@ void Acts::GeometryView3D::drawSurfaceArray(
                                  0.5 * thickness);
         auto cvbOrientedSurfaces = cvb.orientedSurfaces();
         for (const auto& cvbSf : cvbOrientedSurfaces) {
-          drawSurface(helper, *cvbSf.first, gctx,
+          drawSurface(helper, *cvbSf.surface, gctx,
                       Translation3(0., 0., z) * transform, gridRadConfig);
         }
       }
@@ -187,14 +187,13 @@ void Acts::GeometryView3D::drawSurfaceArray(
 }
 
 void Acts::GeometryView3D::drawVolume(IVisualization3D& helper,
-                                      const AbstractVolume& volume,
+                                      const Volume& volume,
                                       const GeometryContext& gctx,
                                       const Transform3& transform,
                                       const ViewConfig& viewConfig) {
-  auto bSurfaces = volume.boundarySurfaces();
+  auto bSurfaces = volume.volumeBounds().orientedSurfaces(volume.transform());
   for (const auto& bs : bSurfaces) {
-    drawSurface(helper, bs->surfaceRepresentation(), gctx, transform,
-                viewConfig);
+    drawSurface(helper, *bs.surface, gctx, transform, viewConfig);
   }
 }
 
@@ -207,7 +206,7 @@ void Acts::GeometryView3D::drawPortal(IVisualization3D& helper,
   // color the portal based on if it contains two links(green)
   // or one link(red)
   auto surface = &(portal.surface());
-  auto links = &(portal.detectorVolumeUpdators());
+  auto links = &(portal.portalNavigation());
   if (links->size() == 2) {
     drawSurface(helper, *surface, gctx, transform, connected);
   } else {

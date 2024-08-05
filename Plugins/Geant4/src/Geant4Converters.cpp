@@ -34,7 +34,9 @@
 #include "G4Box.hh"
 #include "G4LogicalVolume.hh"
 #include "G4Material.hh"
-#include "G4Trap.hh"
+#include "G4RotationMatrix.hh"
+#include "G4ThreeVector.hh"
+#include "G4Transform3D.hh"
 #include "G4Trd.hh"
 #include "G4Tubs.hh"
 #include "G4VPhysicalVolume.hh"
@@ -56,13 +58,11 @@ Acts::Transform3 Acts::Geant4AlgebraConverter::transform(
                       scale * g4Trans[2]);
   // And the rotation to it
   RotationMatrix3 rotation;
-  rotation << g4Rot.xx(), g4Rot.yx(), g4Rot.zx(), g4Rot.xy(), g4Rot.yy(),
-      g4Rot.zy(), g4Rot.xz(), g4Rot.yz(), g4Rot.zz();
+  rotation << g4Rot.xx(), g4Rot.xy(), g4Rot.xz(), g4Rot.yx(), g4Rot.yy(),
+      g4Rot.yz(), g4Rot.zx(), g4Rot.zy(), g4Rot.zz();
   Transform3 transform = Transform3::Identity();
-  transform.matrix().block(0, 0, 3, 1) = rotation.col(0);
-  transform.matrix().block(0, 1, 3, 1) = rotation.col(1);
-  transform.matrix().block(0, 2, 3, 1) = rotation.col(2);
-  transform.matrix().block(0, 3, 3, 1) = translation;
+  transform.rotate(rotation);
+  transform.pretranslate(translation);
   return transform;
 }
 
@@ -171,6 +171,8 @@ Acts::Geant4ShapeConverter::rectangleBounds(const G4Box& g4Box) {
     case 2: {
       rAxes = {0, 1};
     } break;
+    default:  // do nothing
+      break;
   }
   auto rBounds = std::make_shared<RectangleBounds>(hG4XYZ[std::abs(rAxes[0u])],
                                                    hG4XYZ[std::abs(rAxes[1u])]);

@@ -40,7 +40,7 @@ BOOST_AUTO_TEST_CASE(CsvMeasurementRoundTrip) {
   Acts::GeometryIdentifier someGeoId{298453};
 
   std::mt19937 gen(23);
-  std::uniform_int_distribution<unsigned> disti(1, 10);
+  std::uniform_int_distribution<std::uint32_t> disti(1, 10);
   std::uniform_real_distribution<double> distf(0.0, 1.0);
 
   for (auto i = 0ul; i < nMeasurements; ++i) {
@@ -53,8 +53,8 @@ BOOST_AUTO_TEST_CASE(CsvMeasurementRoundTrip) {
     // NOTE this fails:
     // auto m = Acts::makeMeasurement(sl, p, c, eBoundLoc0, eBoundTime)
     // because we don't support non-consecutive parameters here for now
-    auto m = Acts::makeMeasurement(Acts::SourceLink{sl}, p, c, Acts::eBoundLoc0,
-                                   Acts::eBoundLoc1);
+    auto m = makeFixedSizeMeasurement(Acts::SourceLink{sl}, p, c,
+                                      Acts::eBoundLoc0, Acts::eBoundLoc1);
 
     measOriginal.push_back(m);
 

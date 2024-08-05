@@ -8,18 +8,28 @@
 
 #pragma once
 
+<<<<<<< HEAD
 #include "Acts/EventData/MultiTrajectoryHelpers.hpp"
+=======
+>>>>>>> upstream/main
 #include "ActsExamples/EventData/ProtoTrack.hpp"
 #include "ActsExamples/EventData/SimHit.hpp"
 #include "ActsExamples/EventData/SimParticle.hpp"
 #include "ActsExamples/EventData/SimSeed.hpp"
+<<<<<<< HEAD
 #include "ActsExamples/EventData/Trajectories.hpp"
+=======
+#include "ActsExamples/EventData/Track.hpp"
+>>>>>>> upstream/main
 #include "ActsExamples/Framework/DataHandle.hpp"
 #include "ActsExamples/Framework/WriterT.hpp"
 #include "ActsFatras/EventData/Barcode.hpp"
 
+<<<<<<< HEAD
 #include <fstream>
 
+=======
+>>>>>>> upstream/main
 using namespace Acts::UnitLiterals;
 
 namespace ActsExamples {
@@ -39,9 +49,12 @@ namespace ActsExamples {
 /// and each line in the file corresponds to one seed.
 class CsvSeedWriter : public WriterT<TrackParametersContainer> {
  public:
+<<<<<<< HEAD
   using HitParticlesMap = IndexMultimap<ActsFatras::Barcode>;
   using HitSimHitsMap = IndexMultimap<Index>;
 
+=======
+>>>>>>> upstream/main
   struct Config {
     /// Input estimated track parameters collection.
     std::string inputTrackParameters;
@@ -89,15 +102,24 @@ class CsvSeedWriter : public WriterT<TrackParametersContainer> {
 
   /// @brief Struct for brief seed summary info
   ///
+<<<<<<< HEAD
   struct seedInfo {
     size_t seedId = 0;
+=======
+  struct SeedInfo {
+    std::size_t seedID = 0;
+>>>>>>> upstream/main
     ActsFatras::Barcode particleId;
     float seedPt = -1;
     float seedPhi = 0;
     float seedEta = 0;
     float vertexZ = 0;
     float quality = -1;
+<<<<<<< HEAD
     std::vector<Acts::Vector3> globalPosition;
+=======
+    boost::container::small_vector<Acts::Vector3, 3> globalPosition;
+>>>>>>> upstream/main
     float truthDistance = -1;
     std::string seedType = "unknown";
     ProtoTrack measurementsID;

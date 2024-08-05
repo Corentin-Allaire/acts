@@ -47,8 +47,9 @@ BOOST_AUTO_TEST_CASE(SegmentizerCartesian) {
       Acts::Transform3::Identity(), rectangleBounds);
 
   // The segmentation
-  Acts::BinUtility pixelated(20, -1., 1., Acts::open, Acts::binX);
-  pixelated += Acts::BinUtility(20, -1., 1., Acts::open, Acts::binY);
+  Acts::BinUtility pixelated(20, -1., 1., Acts::open, Acts::BinningValue::binX);
+  pixelated +=
+      Acts::BinUtility(20, -1., 1., Acts::open, Acts::BinningValue::binY);
 
   Segmentizer cl;
 
@@ -91,8 +92,9 @@ BOOST_AUTO_TEST_CASE(SegmentizerPolarRadial) {
       Acts::Transform3::Identity(), radialBounds);
 
   // The segmentation
-  Acts::BinUtility strips(2, 5., 10., Acts::open, Acts::binR);
-  strips += Acts::BinUtility(250, -0.25, 0.25, Acts::open, Acts::binPhi);
+  Acts::BinUtility strips(2, 5., 10., Acts::open, Acts::BinningValue::binR);
+  strips += Acts::BinUtility(250, -0.25, 0.25, Acts::open,
+                             Acts::BinningValue::binPhi);
 
   Segmentizer cl;
 
@@ -119,11 +121,22 @@ BOOST_AUTO_TEST_CASE(SegmentizerPolarRadial) {
 }
 
 /// Unit test for testing the Segmentizer
-BOOST_DATA_TEST_CASE(RandomSegmentizerTest,
-                     bdata::random(0., 1.) ^ bdata::random(0., 1.) ^
-                         bdata::random(0., 1.) ^ bdata::random(0., 1.) ^
-                         bdata::xrange(25),
-                     startR0, startR1, endR0, endR1, index) {
+BOOST_DATA_TEST_CASE(
+    RandomSegmentizerTest,
+    bdata::random((
+        bdata::engine = std::mt19937(), bdata::seed = 1,
+        bdata::distribution = std::uniform_real_distribution<double>(0., 1.))) ^
+        bdata::random((bdata::engine = std::mt19937(), bdata::seed = 2,
+                       bdata::distribution =
+                           std::uniform_real_distribution<double>(0., 1.))) ^
+        bdata::random((bdata::engine = std::mt19937(), bdata::seed = 3,
+                       bdata::distribution =
+                           std::uniform_real_distribution<double>(0., 1.))) ^
+        bdata::random((bdata::engine = std::mt19937(), bdata::seed = 4,
+                       bdata::distribution =
+                           std::uniform_real_distribution<double>(0., 1.))) ^
+        bdata::xrange(25),
+    startR0, startR1, endR0, endR1, index) {
   Acts::GeometryContext geoCtx;
   Segmentizer cl;
 
@@ -156,8 +169,8 @@ BOOST_DATA_TEST_CASE(RandomSegmentizerTest,
       }
       // 1 - write the grid
       grid.open("Segmentizer" + name + "Grid.csv");
-      if (segmentation.binningData()[0].binvalue == Acts::binX &&
-          segmentation.binningData()[1].binvalue == Acts::binY) {
+      if (segmentation.binningData()[0].binvalue == Acts::BinningValue::binX &&
+          segmentation.binningData()[1].binvalue == Acts::BinningValue::binY) {
         double bxmin = segmentation.binningData()[0].min;
         double bxmax = segmentation.binningData()[0].max;
         double bymin = segmentation.binningData()[1].min;
@@ -170,8 +183,10 @@ BOOST_DATA_TEST_CASE(RandomSegmentizerTest,
         for (const auto yval : yboundaries) {
           csvHelper.writeLine(grid, {bxmin, yval}, {bxmax, yval});
         }
-      } else if (segmentation.binningData()[0].binvalue == Acts::binR &&
-                 segmentation.binningData()[1].binvalue == Acts::binPhi) {
+      } else if (segmentation.binningData()[0].binvalue ==
+                     Acts::BinningValue::binR &&
+                 segmentation.binningData()[1].binvalue ==
+                     Acts::BinningValue::binPhi) {
         double brmin = segmentation.binningData()[0].min;
         double brmax = segmentation.binningData()[0].max;
         double bphimin = segmentation.binningData()[1].min;

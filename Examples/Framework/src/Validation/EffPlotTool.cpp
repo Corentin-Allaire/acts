@@ -40,7 +40,11 @@ void ActsExamples::EffPlotTool::book(
   // efficiancy vs distance to the closest truth particle
   effPlotCache.trackEff_vs_DeltaR = PlotHelpers::bookEff(
       "trackeff_vs_DeltaR",
+<<<<<<< HEAD
       "Tracking efficiency;Closest track #DeltaR;Efficiency", bDeltaR);
+=======
+      "Tracking efficiency;Closest track #Delta R;Efficiency", bDeltaR);
+>>>>>>> upstream/main
 }
 
 void ActsExamples::EffPlotTool::clear(EffPlotCache& effPlotCache) const {

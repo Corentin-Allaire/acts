@@ -7,6 +7,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #pragma once
 
+#include "Acts/Plugins/Podio/PodioUtil.hpp"
 #include "Acts/Utilities/Logger.hpp"
 #include "ActsExamples/EventData/Cluster.hpp"
 #include "ActsExamples/EventData/IndexSourceLink.hpp"
@@ -17,7 +18,7 @@
 #include <memory>
 #include <string>
 
-#include <podio/ROOTFrameReader.h>
+#include <tbb/enumerable_thread_specific.h>
 
 namespace ActsExamples {
 
@@ -68,7 +69,9 @@ class EDM4hepMeasurementReader final : public IReader {
   std::pair<std::size_t, std::size_t> m_eventsRange;
   std::unique_ptr<const Acts::Logger> m_logger;
 
-  podio::ROOTFrameReader m_reader;
+  tbb::enumerable_thread_specific<Acts::PodioUtil::ROOTReader> m_reader;
+
+  Acts::PodioUtil::ROOTReader& reader();
 
   WriteDataHandle<MeasurementContainer> m_outputMeasurements{
       this, "OutputMeasurements"};
