@@ -36,7 +36,13 @@ def init_seed(size: int, device_acc: str) -> Tensor:
     initial_seed.to(device_acc)
     return initial_seed
 
-def plot_loss(metrics_train : list[float], metrics_val: list[float], loss_name: str, interactive: bool = True):
+
+def plot_loss(
+    metrics_train: list[float],
+    metrics_val: list[float],
+    loss_name: str,
+    interactive: bool = True,
+):
     """
     Plot the loss of the training and validation in different color of the epoch using matplotlib
     Args:
@@ -57,10 +63,12 @@ def plot_loss(metrics_train : list[float], metrics_val: list[float], loss_name: 
     pd.DataFrame(metrics_train).to_csv(loss_name + "_train.csv")
     pd.DataFrame(metrics_val).to_csv(loss_name + "_val.csv")
 
+
 class config:
     """
     Class to store the configuration variable of the training
     """
+
     def __init__(self):
         """
         Initialise the configuration
@@ -112,7 +120,9 @@ class config:
             help="Maximum number of particle input",
         )
         parser.add_argument("--event_test", type=int, default=1, help="Event to test")
-        parser.add_argument("--encoder_only", type=bool, default=False, help="Encoder only")
+        parser.add_argument(
+            "--encoder_only", type=bool, default=False, help="Encoder only"
+        )
         parser.add_argument(
             "--interactive", type=bool, default=True, help="Interactive plot"
         )
@@ -144,6 +154,7 @@ class metrics:
     """
     Class to store the loss (and other performance metrics) of the training and validation
     """
+
     def __init__(self, epoch_nb: int = 1):
         """
         Initialise the metrics
@@ -199,6 +210,7 @@ class metrics:
         print("Epoch", epoch, "loss_momentum is", self.loss_momentum[epoch])
         print("Epoch", epoch, "loss_iter is", self.loss_iter[epoch])
 
+
 def prepare_input_tensor(
     hits: pd.DataFrame,
     particles: pd.DataFrame,
@@ -230,11 +242,19 @@ def prepare_input_tensor(
         particles_event.iloc[-1, -1] = 0
         # Depending on the embedding used, select the right columns from the hits
         if type(embedding) == EmbeddingGeoID:
-            tensor_hit = torch.tensor(hits_event[["volume", "layer", "sensitive", "extra"]].values, dtype=torch.float32)
+            tensor_hit = torch.tensor(
+                hits_event[["volume", "layer", "sensitive", "extra"]].values,
+                dtype=torch.float32,
+            )
         elif type(embedding) == EmbeddingHitPosition:
-            tensor_hit = torch.tensor(hits_event[["tx", "ty", "tz"]].values, dtype=torch.float32)
+            tensor_hit = torch.tensor(
+                hits_event[["tx", "ty", "tz"]].values, dtype=torch.float32
+            )
         elif type(embedding) == EmbeddingHitIDPosition:
-            tensor_hit = torch.tensor(hits_event[["volume", "layer", "tx", "ty", "tz"]].values, dtype=torch.float32)
+            tensor_hit = torch.tensor(
+                hits_event[["volume", "layer", "tx", "ty", "tz"]].values,
+                dtype=torch.float32,
+            )
         tensor_particle = torch.tensor(particles_event.values, dtype=torch.float32)
 
         # Pad the tensors to match the input size
@@ -250,8 +270,9 @@ def prepare_input_tensor(
         else:
             # ID embedding : pad with zeros
             if type(embedding) == EmbeddingGeoID:
-                tensor_hit = torch.cat((tensor_hit, torch.zeros(cfg.max_hit_input - input_size_hits, 4))
-            )
+                tensor_hit = torch.cat(
+                    (tensor_hit, torch.zeros(cfg.max_hit_input - input_size_hits, 4))
+                )
             # hit embedding : pad with the minimal value of the corresponding range : -3000 (bin 0)
             elif type(embedding) == EmbeddingHitPosition:
                 padding = torch.cat(
@@ -304,11 +325,22 @@ def prepare_input_tensor(
         if i == 0:
             input_tensor_hits = tensor_hit.unsqueeze(0)
             input_tensor_particles = tensor_particle.unsqueeze(0)
-            tensor_nb_particle = torch.tensor([len(particles_event)], dtype=torch.float32).unsqueeze(0)
+            tensor_nb_particle = torch.tensor(
+                [len(particles_event)], dtype=torch.float32
+            ).unsqueeze(0)
         else:
             input_tensor_hits = torch.cat((input_tensor_hits, tensor_hit.unsqueeze(0)))
-            input_tensor_particles = torch.cat((input_tensor_particles, tensor_particle.unsqueeze(0)))
-            tensor_nb_particle = torch.cat((tensor_nb_particle, torch.tensor([len(particles_event)], dtype=torch.float32).unsqueeze(0)))
+            input_tensor_particles = torch.cat(
+                (input_tensor_particles, tensor_particle.unsqueeze(0))
+            )
+            tensor_nb_particle = torch.cat(
+                (
+                    tensor_nb_particle,
+                    torch.tensor([len(particles_event)], dtype=torch.float32).unsqueeze(
+                        0
+                    ),
+                )
+            )
 
     # Move the tensor to the right device
     input_tensor_hits.to(cfg.device_acc)
@@ -317,10 +349,18 @@ def prepare_input_tensor(
     padding_mask_particle.to(cfg.device_acc)
     tensor_nb_particle.to(cfg.device_acc)
 
-    return input_tensor_hits, input_tensor_particles, tensor_nb_particle, padding_mask_hit, padding_mask_particle
+    return (
+        input_tensor_hits,
+        input_tensor_particles,
+        tensor_nb_particle,
+        padding_mask_hit,
+        padding_mask_particle,
+    )
 
 
-def read_data(file_hits: str, file_particles: str, vertex_cuts:list = [10, 10, 200] ) -> Tuple[pd.DataFrame, pd.DataFrame, int]:
+def read_data(
+    file_hits: str, file_particles: str, vertex_cuts: list = [10, 10, 200]
+) -> Tuple[pd.DataFrame, pd.DataFrame, int]:
     """
     Read the hits and particles csv files and return the DataFrames and the number of events in the dataset dataset after cuts
     Args:
@@ -350,6 +390,7 @@ def read_data(file_hits: str, file_particles: str, vertex_cuts:list = [10, 10, 2
     nb_events = len(hits["event_id"].unique())
     return hits, particles, nb_events
 
+
 def decoder_loss(
     vertex: Tensor,
     momentum: Tensor,
@@ -376,9 +417,13 @@ def decoder_loss(
     loss_iter = F.binary_cross_entropy(keep_iterating, particles[:, :, 6].unsqueeze(-1))
 
     # Extract the keep_iterating value for the last particle in the event (it should be 0)
-    stop_iterating = keep_iterating - (keep_iterating*particles[:, :, 6].unsqueeze(-1))
+    stop_iterating = keep_iterating - (
+        keep_iterating * particles[:, :, 6].unsqueeze(-1)
+    )
     # Compute the corresponding loss, enrich_iter will be used to balance the case iter=0 and iter=1
-    loss_iter = (1 - enrich_iter) * loss_iter + enrich_iter * 100 * F.mse_loss(torch.zeros_like(stop_iterating), stop_iterating)
+    loss_iter = (1 - enrich_iter) * loss_iter + enrich_iter * 100 * F.mse_loss(
+        torch.zeros_like(stop_iterating), stop_iterating
+    )
 
     return loss_vertex, loss_momentum, loss_iter
 
@@ -393,7 +438,7 @@ def compute_loss(
     mask_particle: Tensor,
     initial_seed: Tensor,
     model: SeedTransformer,
-    encoder_only: bool = False, 
+    encoder_only: bool = False,
 ) -> Tensor:
     """
     Run the encoder and decoder on the hits and particles and compute the associated loss for one batch
@@ -416,7 +461,11 @@ def compute_loss(
     loss_nb = F.mse_loss(nb_seed, nb_particles)
 
     if encoder_only == True:
-        loss_vertex, loss_momentum, loss_iter = torch.zeros(1), torch.zeros(1), torch.zeros(1)
+        loss_vertex, loss_momentum, loss_iter = (
+            torch.zeros(1),
+            torch.zeros(1),
+            torch.zeros(1),
+        )
     else:
         # We will now run the decoder on the particles
         # Create the decoder input by concatenating the initial seed with the particles
@@ -430,7 +479,9 @@ def compute_loss(
         # set to 0 all the element of elements that are not in the nb_particles
         vertex = vertex - vertex * padding_mask_particle.unsqueeze(-1)
         momentum = momentum - momentum * padding_mask_particle.unsqueeze(-1)
-        keep_iterating = keep_iterating - keep_iterating * padding_mask_particle.unsqueeze(-1)
+        keep_iterating = (
+            keep_iterating - keep_iterating * padding_mask_particle.unsqueeze(-1)
+        )
 
         # Compute the decoder loss
         loss_vertex, loss_momentum, loss_iter = decoder_loss(
@@ -496,7 +547,9 @@ def run_model(
             ]
             # Create the lookahead mask for the hit (encoder) and particle (decoder)
             mask_hits = build_look_ahead_mask(cfg.max_hit_input, cfg.device_acc)
-            mask_particle = build_look_ahead_mask(cfg.max_particle_input, cfg.device_acc)
+            mask_particle = build_look_ahead_mask(
+                cfg.max_particle_input, cfg.device_acc
+            )
             # Create an initialisation seed for the transformer
             initial_seed = init_seed(cfg.batch_size, cfg.device_acc)
             # Compute the loos for the batch
@@ -563,7 +616,13 @@ def test_model(
     mask_particles = build_look_ahead_mask(cfg.max_particle_input, cfg.device_acc)
     initial_seed = init_seed(1, cfg.device_acc)
     # Pad the initial seed up to the maximum number of seed
-    initial_seed = torch.cat((initial_seed,torch.zeros(1, cfg.max_particle_input - 1, 7, device=cfg.device_acc)), dim=1)
+    initial_seed = torch.cat(
+        (
+            initial_seed,
+            torch.zeros(1, cfg.max_particle_input - 1, 7, device=cfg.device_acc),
+        ),
+        dim=1,
+    )
 
     for event in range(nb_events):
         # Run the encoder on the hits
@@ -576,7 +635,7 @@ def test_model(
             None,
         )
 
-        print("testing event ", nb_events+1)
+        print("testing event ", nb_events + 1)
         print("The number of track is :", nb_particles[event])
         print("The number of seed evaluated by the encoder is ", nb_seeds_encoded[0])
         print("The number of seed found is ", nb_seeds[0])
@@ -590,6 +649,7 @@ def test_model(
             print("Seed momentum", seed_momentum[0, seed])
             seed_i += 1
 
+
 def main():
     """
     Main function to run the training of the transformer model for seed reconstruction
@@ -600,7 +660,7 @@ def main():
 
     # Set the device to use
     if torch.cuda.is_available():
-        cfg.device_acc = torch.device('cuda:0')
+        cfg.device_acc = torch.device("cuda:0")
 
     # Print starting information
     print("Starting the training of the transformer model for seed reconstruction")
@@ -608,7 +668,9 @@ def main():
     print("Using device:", cfg.device_acc)
 
     # Open the hits and particles csv files
-    hits_train, particles_train, nb_events = read_data("train/hits.csv", "train/particles.csv", cfg.vertex_cuts)
+    hits_train, particles_train, nb_events = read_data(
+        "train/hits.csv", "train/particles.csv", cfg.vertex_cuts
+    )
 
     if cfg.embedding == "ID":
         embedding_encoder = EmbeddingGeoID(
@@ -670,7 +732,9 @@ def main():
     #         print(name, param.data)
 
     # Train the model
-    model, metrics_train = run_model(cfg, hits_train, particles_train, nb_events, model, opt)
+    model, metrics_train = run_model(
+        cfg, hits_train, particles_train, nb_events, model, opt
+    )
 
     # Save the model
     torch.save(model, "transformer.pt")
@@ -693,9 +757,21 @@ def main():
     # Display plot of the loss of the training and validation as a function of the epoch
     plot_loss(metrics_train.loss, metrics_val.loss, "Loss", cfg.interactive)
     plot_loss(metrics_train.loss_nb, metrics_val.loss_nb, "Loss_nb", cfg.interactive)
-    plot_loss(metrics_train.loss_vertex, metrics_val.loss_vertex, "Loss_vertex", cfg.interactive)
-    plot_loss(metrics_train.loss_momentum, metrics_val.loss_momentum, "Loss_momentum", cfg.interactive)
-    plot_loss(metrics_train.loss_iter, metrics_val.loss_iter, "Loss_iter", cfg.interactive)
+    plot_loss(
+        metrics_train.loss_vertex,
+        metrics_val.loss_vertex,
+        "Loss_vertex",
+        cfg.interactive,
+    )
+    plot_loss(
+        metrics_train.loss_momentum,
+        metrics_val.loss_momentum,
+        "Loss_momentum",
+        cfg.interactive,
+    )
+    plot_loss(
+        metrics_train.loss_iter, metrics_val.loss_iter, "Loss_iter", cfg.interactive
+    )
 
     # Delete all the variable to free some memory
     del hits_val

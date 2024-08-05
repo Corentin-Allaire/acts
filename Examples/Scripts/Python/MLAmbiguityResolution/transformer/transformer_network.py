@@ -35,6 +35,7 @@ class SeedTransformer(nn.Module):
         - dim_seed: Maximum number of reconstructed seed in the output
 
     """
+
     def __init__(
         self,
         nb_encoder_layers: int,
@@ -123,7 +124,7 @@ class SeedTransformer(nn.Module):
         encoded = self.transformer.encoder(
             src=embedded_src, mask=mask, src_key_padding_mask=padding_mask
         )
-        return encoded, self.nb_seeds_from_encoded(encoded[:,-1])
+        return encoded, self.nb_seeds_from_encoded(encoded[:, -1])
 
     def decode(
         self,
@@ -195,8 +196,8 @@ class SeedTransformer(nn.Module):
         nb_loop = 0
         keep_iteration = True
         nb_seeds = Tensor(seed.size(0)).to(seed.device)
-        seed_vertex = Tensor(seed.size(0),seed.size(1), 3).to(seed.device)
-        seed_momentum = Tensor(seed.size(0),seed.size(1), 3).to(seed.device)
+        seed_vertex = Tensor(seed.size(0), seed.size(1), 3).to(seed.device)
+        seed_momentum = Tensor(seed.size(0), seed.size(1), 3).to(seed.device)
 
         while nb_loop < mask_hits.size(0) and keep_iteration:
             # Decode the target sequence

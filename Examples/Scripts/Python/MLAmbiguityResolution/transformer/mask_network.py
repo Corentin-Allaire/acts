@@ -13,10 +13,11 @@ def build_look_ahead_mask(size: int, device: torch.device):
     """
     square = torch.ones(size, size)
     mask = square.triu(diagonal=1)
-    mask = mask * float('-inf')
+    mask = mask * float("-inf")
     mask[torch.isnan(mask)] = 1
     mask.to(device)
     return mask
+
 
 def build_mask_volume_layer(data: torch.Tensor, device: torch.device):
     """
@@ -35,7 +36,7 @@ def build_mask_volume_layer(data: torch.Tensor, device: torch.device):
     for i in range(data.size(0)):
         for j in range(data.size(0)):
             mask[i, j] = (volume[j] == volume[i]) & (layer[j] <= layer[i])
-    mask = mask * float('-inf')
+    mask = mask * float("-inf")
     mask[torch.isnan(mask)] = 1
     mask.to(device)
     return mask

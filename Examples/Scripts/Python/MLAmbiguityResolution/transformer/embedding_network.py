@@ -15,7 +15,8 @@ def sort_by_position(data: pd.DataFrame) -> pd.DataFrame:
         - Sorted DataFrame
     """
     data = data.sort_values(by=["r", "z"], key=abs)
-    return data    
+    return data
+
 
 class EmbeddingGeoID(nn.Module):
     """
@@ -36,12 +37,28 @@ class EmbeddingGeoID(nn.Module):
         - embeddingExtra: Embedding layer for the extra information
         - dropout: Dropout layer
     """
-    def __init__(self, emb_size: int, max_volume: int, max_layer: int, max_sensitive: int, max_extra: int, dropout: float = 0.1, device: str = "cpu"):
+
+    def __init__(
+        self,
+        emb_size: int,
+        max_volume: int,
+        max_layer: int,
+        max_sensitive: int,
+        max_extra: int,
+        dropout: float = 0.1,
+        device: str = "cpu",
+    ):
         super(EmbeddingGeoID, self).__init__()
         # Embedding layers
-        self.embeddingVolume = nn.Embedding(max_volume, emb_size, padding_idx=0, device=device)
-        self.embeddingLayer = nn.Embedding(max_layer, emb_size, padding_idx=0, device=device)
-        self.embeddingSensitive = nn.Embedding(max_sensitive, emb_size, padding_idx=0, device=device)
+        self.embeddingVolume = nn.Embedding(
+            max_volume, emb_size, padding_idx=0, device=device
+        )
+        self.embeddingLayer = nn.Embedding(
+            max_layer, emb_size, padding_idx=0, device=device
+        )
+        self.embeddingSensitive = nn.Embedding(
+            max_sensitive, emb_size, padding_idx=0, device=device
+        )
         self.embeddingExtra = nn.Embedding(
             max_extra, emb_size, padding_idx=0, device=device
         )
@@ -56,13 +73,14 @@ class EmbeddingGeoID(nn.Module):
         Returns:
             - Tensor: The embedded values
         """
-        volume = self.embeddingVolume(x[:,:,0].int())
+        volume = self.embeddingVolume(x[:, :, 0].int())
         layer = self.embeddingLayer(x[:, :, 1].int())
         sensitive = self.embeddingSensitive(x[:, :, 2].int())
         extra = self.embeddingExtra(x[:, :, 3].int())
         # Sum the embeddings
         sum_embedding = volume + layer + sensitive + extra
         return self.dropout(sum_embedding)
+
 
 # Define an embedding class for the encoder input
 # This class will embed the hit position into a higher dimensional space
@@ -81,7 +99,7 @@ class EmbeddingHitPosition(nn.Module):
         - bins_y (int): Number of bins for the y position
         - bins_z (int): Number of bins for the z position
         - dropout (float): Dropout rate
-        - device (str): Device to run the model on (cpu or cuda)  
+        - device (str): Device to run the model on (cpu or cuda)
     Members:
         - range_x: Range of the x position
         - range_y: Range of the y position
@@ -94,6 +112,7 @@ class EmbeddingHitPosition(nn.Module):
         - embedding_z: Embedding layer for the z position
         - dropout: Dropout layer
     """
+
     def __init__(
         self,
         emb_size: int,
@@ -152,6 +171,7 @@ class EmbeddingHitPosition(nn.Module):
         sum_embedding = x_emb + y_emb + z_emb
         return self.dropout(sum_embedding)
 
+
 class EmbeddingHitIDPosition(nn.Module):
     """
     Embedding based on the position of the hits and the volume and layer ID
@@ -166,7 +186,7 @@ class EmbeddingHitIDPosition(nn.Module):
         - bins_y (int): Number of bins for the y position
         - bins_z (int): Number of bins for the z position
         - dropout (float): Dropout rate
-        - device (str): Device to run the model on (cpu or cuda) 
+        - device (str): Device to run the model on (cpu or cuda)
     Members:
         - range_x: Range of the x position
         - range_y: Range of the y position
@@ -179,8 +199,9 @@ class EmbeddingHitIDPosition(nn.Module):
         - embedding_x: Embedding layer for the x position
         - embedding_y: Embedding layer for the y position
         - embedding_z: Embedding layer for the z position
-        - dropout: Dropout layer 
+        - dropout: Dropout layer
     """
+
     def __init__(
         self,
         emb_size: int,
@@ -203,8 +224,12 @@ class EmbeddingHitIDPosition(nn.Module):
         self.bins_y = bins_y
         self.bins_z = bins_z
         # Embedding layer !!!! NEED TO THINK OF THE PADDING !!!!
-        self.embeddingVolume = nn.Embedding(max_volume, emb_size, padding_idx=0, device=device)
-        self.embeddingLayer = nn.Embedding(max_layer, emb_size, padding_idx=0, device=device)
+        self.embeddingVolume = nn.Embedding(
+            max_volume, emb_size, padding_idx=0, device=device
+        )
+        self.embeddingLayer = nn.Embedding(
+            max_layer, emb_size, padding_idx=0, device=device
+        )
         self.embedding_x = nn.Embedding(bins_x, emb_size, padding_idx=0, device=device)
         self.embedding_y = nn.Embedding(bins_y, emb_size, padding_idx=0, device=device)
         self.embedding_z = nn.Embedding(bins_z, emb_size, padding_idx=0, device=device)
@@ -243,22 +268,26 @@ class EmbeddingHitIDPosition(nn.Module):
 
 # Define a positional encoding class for the decoder input
 class PositionalEncoder(nn.Module):
-    def __init__(self, emb_size: int, max_seq_len: int, dropout: float = 0.1, device: str = "cpu"):
+    def __init__(
+        self, emb_size: int, max_seq_len: int, dropout: float = 0.1, device: str = "cpu"
+    ):
         super(PositionalEncoder, self).__init__()
         self.emb_size = emb_size
         self.dropout = nn.Dropout(dropout)
         # Create positional encoding matrix
         pe = torch.zeros(max_seq_len, emb_size)
         position = torch.arange(0, max_seq_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, emb_size, 2).float() * (-math.log(10000.0) / emb_size))
+        div_term = torch.exp(
+            torch.arange(0, emb_size, 2).float() * (-math.log(10000.0) / emb_size)
+        )
         pe.to(device)
         position.to(device)
         div_term.to(device)
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
-        self.register_buffer('pe', pe)
+        self.register_buffer("pe", pe)
 
     def forward(self, x: Tensor) -> Tensor:
         x = x * math.sqrt(self.emb_size)
-        x = x + self.pe[:, :x.size(1)]
+        x = x + self.pe[:, : x.size(1)]
         return self.dropout(x)

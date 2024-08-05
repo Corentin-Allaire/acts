@@ -32,8 +32,8 @@ def extract_masked_values(value):
 def main():
     """
     Main function to run the preprocessing of the data. In this preprocessing, the data is read from the different files (on per event)
-    and the particles are filtered to keep only the ones with at least 7 hits in the data and ordered by decreasing pT. 
-    Hits outside the seeing region are removed and the geometry id is converted to volume, layer, sensitive and extra values. 
+    and the particles are filtered to keep only the ones with at least 7 hits in the data and ordered by decreasing pT.
+    Hits outside the seeing region are removed and the geometry id is converted to volume, layer, sensitive and extra values.
     Finally the data is saved in a new single file.
     """
 
@@ -64,23 +64,53 @@ def main():
                 particles = particles[particles["particle_id"] != particle_id]
 
         # Remove the particles with no momentum
-        particles = particles[particles["pz"] != 0] 
+        particles = particles[particles["pz"] != 0]
 
-        data = data.drop(columns=["tpx", "tpy", "tpz", "te", "deltapx", "deltapy", "deltapz", "deltae", "index"])
+        data = data.drop(
+            columns=[
+                "tpx",
+                "tpy",
+                "tpz",
+                "te",
+                "deltapx",
+                "deltapy",
+                "deltapz",
+                "deltae",
+                "index",
+            ]
+        )
         # Remove all entry with |tz|> 3000 and sqrt(tx^2 + ty^2) > 250
-        data = data[(data['tz'] < 3000) & (data['tz'] > -3000) & (data['tx']**2 + data['ty']**2 < 200**2)]
+        data = data[
+            (data["tz"] < 3000)
+            & (data["tz"] > -3000)
+            & (data["tx"] ** 2 + data["ty"] ** 2 < 200**2)
+        ]
         # Compute the value of eta (pseudo rapidity) and phi (angle with respect to the the z axis) for all entry base on a starting position at (0,0,0):
-        data["eta"] = -1 * np.log(np.tan(np.arctan2(np.sqrt(data["tx"] ** 2 + data["ty"] ** 2), data["tz"]) / 2))
+        data["eta"] = -1 * np.log(
+            np.tan(
+                np.arctan2(np.sqrt(data["tx"] ** 2 + data["ty"] ** 2), data["tz"]) / 2
+            )
+        )
         data["phi"] = np.arctan2(data["ty"], data["tx"])
         data["r"] = np.sqrt(data["tx"] ** 2 + data["ty"] ** 2)
         # Same for particles using the momentum
-        particles["eta"] = -1 * np.log(np.tan(np.arctan2(np.sqrt(particles["px"] ** 2 + particles["py"] ** 2),particles["pz"]) / 2))
+        particles["eta"] = -1 * np.log(
+            np.tan(
+                np.arctan2(
+                    np.sqrt(particles["px"] ** 2 + particles["py"] ** 2),
+                    particles["pz"],
+                )
+                / 2
+            )
+        )
         particles["phi"] = np.arctan2(particles["py"], particles["px"])
         particles["pT"] = np.sqrt(particles["px"] ** 2 + particles["py"] ** 2)
         # Sort the particles by decreasing pT
         particles = particles.sort_values("pT", ascending=False)
         # Use the bit map to extract the volume, layer, sensitive and extra values
-        data["volume"], data["layer"], data["sensitive"], data["extra"] = zip(*data["geometry_id"].map(extract_masked_values))
+        data["volume"], data["layer"], data["sensitive"], data["extra"] = zip(
+            *data["geometry_id"].map(extract_masked_values)
+        )
         data = data.drop(columns=["geometry_id"])
 
         # Add an event id to the data
@@ -93,6 +123,7 @@ def main():
     # Write the new files
     full_data.to_csv("odd_output/hits.csv", index=False)
     full_particles.to_csv("odd_output/particles.csv", index=False)
+
 
 if __name__ == "__main__":
     sys.exit(main())
