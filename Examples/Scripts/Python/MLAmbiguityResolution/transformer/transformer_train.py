@@ -345,11 +345,11 @@ def prepare_input_tensor(
             )
 
     # Move the tensor to the right device
-    input_tensor_hits.to(cfg.device_acc)
-    input_tensor_particles.to(cfg.device_acc)
-    padding_mask_hit.to(cfg.device_acc)
-    padding_mask_particle.to(cfg.device_acc)
-    tensor_nb_particle.to(cfg.device_acc)
+    # input_tensor_hits.to(cfg.device_acc)
+    # input_tensor_particles.to(cfg.device_acc)
+    # padding_mask_hit.to(cfg.device_acc)
+    # padding_mask_particle.to(cfg.device_acc)
+    # tensor_nb_particle.to(cfg.device_acc)
 
     return (
         input_tensor_hits,
@@ -463,6 +463,14 @@ def compute_loss(
         - A tuple containing the loss for the number of seed, the loss for the vertex, the loss for the momentum and the loss for the iter value
     """
     # Run the encoder on the hits
+    # Print the device of the encoder input
+    print("The device of the encoder input is", hits.device)
+    # Add all the input tensor to the device
+    hits = hits.to(model.device)
+    padding_mask_hits = padding_mask_hits.to(model.device)
+    padding_mask_particle = padding_mask_particle.to(model.device)
+    nb_particles = nb_particles.to(model.device)
+
     encoded, nb_seed = model.encode(hits, mask_hits, padding_mask_hits)
     # Compute the loss for nb_seed by comparing its value to the number of particles in the events of the batch
     loss_nb = F.mse_loss(nb_seed, nb_particles)
@@ -502,11 +510,13 @@ def compute_loss(
 
 
 def run_model(
+    epoch: int,
     cfg: config,
     hits: pd.DataFrame,
     particles: pd.DataFrame,
     nb_events: int,
     model: SeedTransformer,
+    met: metrics,
     optimiser: torch.optim.Optimizer = None,
 ) -> SeedTransformer:
     """
@@ -520,8 +530,6 @@ def run_model(
     Returns:
         - The trained transformer model.
     """
-    # Create the metrics object to store the loss
-    met = metrics(cfg.epoch_nb)
     # Prepare the input tensor and padding mask
     (
         input_tensor_hits,
@@ -531,64 +539,63 @@ def run_model(
         padding_mask_particle,
     ) = prepare_input_tensor(hits, particles, nb_events, cfg, model.embedding_encoder)
 
-    # Loop over the number of epoch
-    for epoch in range(cfg.epoch_nb):
-        # Loop over the event batches
-        for i in range(input_tensor_hits.size(0) // cfg.batch_size):
-            print("Training batch:", i)
-            # Select the batch of hits and particles
-            batch_tensor_hits = input_tensor_hits[
-                i * cfg.batch_size : (i + 1) * cfg.batch_size
-            ]
-            batch_tensor_particles = input_tensor_particles[
-                i * cfg.batch_size : (i + 1) * cfg.batch_size
-            ]
-            batch_padding_hit = padding_mask_hit[
-                i * cfg.batch_size : (i + 1) * cfg.batch_size
-            ]
-            batch_padding_particle = padding_mask_particle[
-                i * cfg.batch_size : (i + 1) * cfg.batch_size
-            ]
-            batch_nb_particles = nb_particles[
-                i * cfg.batch_size : (i + 1) * cfg.batch_size
-            ]
-            # Create the lookahead mask for the hit (encoder) and particle (decoder)
-            mask_hits = build_look_ahead_mask(cfg.max_hit_input, cfg.device_acc)
-            mask_particle = build_look_ahead_mask(
-                cfg.max_particle_input, cfg.device_acc
-            )
-            # Create an initialisation seed for the transformer
-            initial_seed = init_seed(cfg.batch_size, cfg.device_acc)
-            # Compute the loos for the batch
-            loss_nb, loss_vertex, loss_momentum, loss_iter = compute_loss(
-                batch_tensor_hits,
-                batch_tensor_particles,
-                batch_padding_hit,
-                batch_padding_particle,
-                batch_nb_particles,
-                mask_hits,
-                mask_particle,
-                initial_seed,
-                model,
-                cfg.encoder_only,
-            )
-            loss = loss_nb + loss_vertex + loss_momentum + loss_iter
-            met.add_loss(
-                epoch,
-                loss.item(),
-                loss_nb.item(),
-                loss_vertex.item(),
-                loss_momentum.item(),
-                loss_iter.item(),
-            )
-            # If we are training, backpropagate the loss
-            if optimiser is not None:
-                loss.backward()
-                optimiser.step()
-                optimiser.zero_grad()
-            # # in case of debugging, only run the first 10 events
-            # if i == 3:
-            #     break
+    nb_batches = input_tensor_hits.size(0) // cfg.batch_size
+    # Loop over the event batches
+    for i in range(nb_batches):
+        if optimiser is not None and i % 100 == 0:
+            print("Training batch:", i, "/", nb_batches)
+        else:
+            print("Validation batch:", i, "/", nb_batches)
+
+        # Select the batch of hits and particles
+        batch_tensor_hits = input_tensor_hits[
+            i * cfg.batch_size : (i + 1) * cfg.batch_size
+        ]
+        batch_tensor_particles = input_tensor_particles[
+            i * cfg.batch_size : (i + 1) * cfg.batch_size
+        ]
+        batch_padding_hit = padding_mask_hit[
+            i * cfg.batch_size : (i + 1) * cfg.batch_size
+        ]
+        batch_padding_particle = padding_mask_particle[
+            i * cfg.batch_size : (i + 1) * cfg.batch_size
+        ]
+        batch_nb_particles = nb_particles[i * cfg.batch_size : (i + 1) * cfg.batch_size]
+        # Create the lookahead mask for the hit (encoder) and particle (decoder)
+        mask_hits = build_look_ahead_mask(cfg.max_hit_input, cfg.device_acc)
+        mask_particle = build_look_ahead_mask(cfg.max_particle_input, cfg.device_acc)
+        # Create an initialisation seed for the transformer
+        initial_seed = init_seed(cfg.batch_size, cfg.device_acc)
+        # Compute the loos for the batch
+        loss_nb, loss_vertex, loss_momentum, loss_iter = compute_loss(
+            batch_tensor_hits,
+            batch_tensor_particles,
+            batch_padding_hit,
+            batch_padding_particle,
+            batch_nb_particles,
+            mask_hits,
+            mask_particle,
+            initial_seed,
+            model,
+            cfg.encoder_only,
+        )
+        loss = loss_nb + loss_vertex + loss_momentum + loss_iter
+        met.add_loss(
+            epoch,
+            loss.item(),
+            loss_nb.item(),
+            loss_vertex.item(),
+            loss_momentum.item(),
+            loss_iter.item(),
+        )
+        # If we are training, backpropagate the loss
+        if optimiser is not None:
+            loss.backward()
+            optimiser.step()
+            optimiser.zero_grad()
+        # # in case of debugging, only run the first 10 events
+        # if i == 3:
+        #     break
 
     return model, met
 
@@ -676,9 +683,8 @@ def main():
 
     # Open the hits and particles csv files
     hits_train, particles_train, nb_events = read_data(
-        "train/hits.csv", "train/particles.csv", cfg.vertex_cuts
+        "train/hits.csv", "train/particles.csv", 0, cfg.vertex_cuts
     )
-
     # hits_train = pd.DataFrame()
     # particles_train = pd.DataFrame()
     # val_fraction = 0.1
@@ -687,6 +693,22 @@ def main():
     # nb_events = 0
     # for i in range(math.floor(nb_files*(1-val_fraction))):
     #     hits, particles, nb_events = read_data("train/odd_full_chain_" + str(i) + "/hits.csv", "train/odd_full_chain_" + str(i) + "/particles.csv", nb_events, cfg.vertex_cuts)
+    #     hits_train = pd.concat([hits_train, hits])
+    #     particles_train = pd.concat([particles_train, particles])
+
+    hits_val, particles_val, nb_events = read_data(
+        "val/hits.csv", "val/particles.csv", 0, cfg.vertex_cuts
+    )
+    # hits_train = pd.DataFrame()
+    # particles_train = pd.DataFrame()
+    # nb_events = 0
+    # for i in range(math.floor(nb_files * (1 - val_fraction)), nb_files):
+    #     hits, particles, nb_events = read_data(
+    #         "train/odd_full_chain_" + str(i) + "/hits.csv",
+    #         "train/odd_full_chain_" + str(i) + "/particles.csv",
+    #         nb_events,
+    #         cfg.vertex_cuts,
+    #     )
     #     hits_train = pd.concat([hits_train, hits])
     #     particles_train = pd.concat([particles_train, particles])
 
@@ -749,10 +771,33 @@ def main():
     #     if param.requires_grad:
     #         print(name, param.data)
 
-    # Train the model
-    model, metrics_train = run_model(
-        cfg, hits_train, particles_train, nb_events, model, opt
-    )
+    # Initialise the metrics
+    metrics_train = metrics(cfg.epoch_nb)
+    metrics_val = metrics(cfg.epoch_nb)
+
+    for epoch in range(cfg.epoch_nb):
+        print("Epoch: ", epoch)
+
+        # Train the model
+        model.train()
+        model, metrics_train = run_model(
+            epoch,
+            cfg,
+            hits_train,
+            particles_train,
+            nb_events,
+            model,
+            metrics_train,
+            opt,
+        )
+
+        # Validate the model
+        with torch.no_grad():
+            # Perform the validation of the model
+            model.eval()
+            _, metrics_val = run_model(
+                epoch, cfg, hits_val, particles_val, nb_events, model, metrics_val
+            )
 
     # Save the model
     torch.save(model, "transformer.pt")
@@ -766,25 +811,6 @@ def main():
     # Perform the validation of the model
     model = torch.load("transformer.pt")
     model.to(cfg.device_acc)
-    hits_val, particles_val, nb_events = read_data(
-        "val/hits.csv", "val/particles.csv", cfg.vertex_cuts
-    )
-
-    # hits_train = pd.DataFrame()
-    # particles_train = pd.DataFrame()
-    # nb_events = 0
-    # for i in range(math.floor(nb_files * (1 - val_fraction)), nb_files):
-    #     hits, particles, nb_events = read_data(
-    #         "train/odd_full_chain_" + str(i) + "/hits.csv",
-    #         "train/odd_full_chain_" + str(i) + "/particles.csv",
-    #         nb_events,
-    #         cfg.vertex_cuts,
-    #     )
-    #     hits_train = pd.concat([hits_train, hits])
-    #     particles_train = pd.concat([particles_train, particles])
-
-    model.eval()
-    _, metrics_val = run_model(cfg, hits_val, particles_val, nb_events, model)
 
     # Display plot of the loss of the training and validation as a function of the epoch
     plot_loss(metrics_train.loss, metrics_val.loss, "Loss", cfg.interactive)
@@ -815,7 +841,7 @@ def main():
     if cfg.event_test > 0:
         # Perform the testing of the model
         hits_test, particles_test, nb_events = read_data(
-            "test/hits.csv", "train/particles.csv", cfg.vertex_cuts
+            "test/hits.csv", "train/particles.csv", 0, cfg.vertex_cuts
         )
         test_model(cfg, hits_test, particles_test, cfg.event_test, model)
 
