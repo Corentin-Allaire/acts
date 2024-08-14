@@ -512,9 +512,11 @@ def compute_loss(
 def run_model(
     epoch: int,
     cfg: config,
-    hits: pd.DataFrame,
-    particles: pd.DataFrame,
-    nb_events: int,
+    input_tensor_hits: Tensor,
+    input_tensor_particles: Tensor,
+    nb_particles: Tensor,
+    padding_mask_hit: Tensor,
+    padding_mask_particle: Tensor,
     model: SeedTransformer,
     met: metrics,
     optimiser: torch.optim.Optimizer = None,
@@ -530,14 +532,6 @@ def run_model(
     Returns:
         - The trained transformer model.
     """
-    # Prepare the input tensor and padding mask
-    (
-        input_tensor_hits,
-        input_tensor_particles,
-        nb_particles,
-        padding_mask_hit,
-        padding_mask_particle,
-    ) = prepare_input_tensor(hits, particles, nb_events, cfg, model.embedding_encoder)
 
     nb_batches = input_tensor_hits.size(0) // cfg.batch_size
     # Loop over the event batches
@@ -682,7 +676,7 @@ def main():
     print("Using device:", cfg.device_acc)
 
     # Open the hits and particles csv files
-    hits_train, particles_train, nb_events = read_data(
+    hits_train, particles_train, nb_events_train = read_data(
         "train/hits.csv", "train/particles.csv", 0, cfg.vertex_cuts
     )
     # hits_train = pd.DataFrame()
@@ -696,7 +690,7 @@ def main():
     #     hits_train = pd.concat([hits_train, hits])
     #     particles_train = pd.concat([particles_train, particles])
 
-    hits_val, particles_val, nb_events = read_data(
+    hits_val, particles_val, nb_events_val = read_data(
         "val/hits.csv", "val/particles.csv", 0, cfg.vertex_cuts
     )
     # hits_train = pd.DataFrame()
@@ -775,6 +769,28 @@ def main():
     metrics_train = metrics(cfg.epoch_nb)
     metrics_val = metrics(cfg.epoch_nb)
 
+    # Prepare the input tensor and padding mask
+    (
+        input_tensor_hits_train,
+        input_tensor_particles_train,
+        nb_particles_train,
+        padding_mask_hit_train,
+        padding_mask_particle_train,
+    ) = prepare_input_tensor(
+        hits_train, particles_train, nb_events_train, cfg, model.embedding_encoder
+    )
+
+    # Prepare the input tensor and padding mask
+    (
+        input_tensor_hits_val,
+        input_tensor_particles_val,
+        nb_particles_val,
+        padding_mask_hit_val,
+        padding_mask_particle_val,
+    ) = prepare_input_tensor(
+        hits_val, particles_val, nb_events_val, cfg, model.embedding_encoder
+    )
+
     for epoch in range(cfg.epoch_nb):
         print("Epoch: ", epoch)
 
@@ -783,9 +799,11 @@ def main():
         model, metrics_train = run_model(
             epoch,
             cfg,
-            hits_train,
-            particles_train,
-            nb_events,
+            input_tensor_hits_train,
+            input_tensor_particles_train,
+            nb_particles_train,
+            padding_mask_hit_train,
+            padding_mask_particle_train,
             model,
             metrics_train,
             opt,
@@ -796,7 +814,15 @@ def main():
             # Perform the validation of the model
             model.eval()
             _, metrics_val = run_model(
-                epoch, cfg, hits_val, particles_val, nb_events, model, metrics_val
+                epoch,
+                cfg,
+                input_tensor_hits_val,
+                input_tensor_particles_val,
+                nb_particles_val,
+                padding_mask_hit_val,
+                padding_mask_particle_val,
+                model,
+                metrics_val,
             )
 
     # Save the model
