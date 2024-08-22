@@ -63,7 +63,7 @@ class SeedTransformer(nn.Module):
         self.embedding_encoder = embedding_network
 
         # Initialise the embedding for the decoder
-        self.embedding_decoder = nn.Linear(7, dim_embedding)
+        self.embedding_decoder = nn.Linear(5, dim_embedding)
 
         # Positional encoding for the decoder input
         self.pos_encoding_decoder = PositionalEncoder(
@@ -75,14 +75,12 @@ class SeedTransformer(nn.Module):
 
         # Linear layer to extract the expected number of seed from the encoded information
         self.nb_seeds_from_encoded = nn.Linear(
-            dim_embedding,
+            dim_hits,
             1,
             device=device_acc,
         )
-        # Linear layer to extract the vertex position from the decoder output
-        self.seed_vertex = nn.Linear(dim_embedding, 3, device=device_acc)
-        # Linear layer to extract the seed momentum from the decoder output
-        self.seed_momentum = nn.Linear(dim_embedding, 3, device=device_acc)
+        # Linear layer to extract the seed Z0 and momentum from the decoder output
+        self.seed_momentum = nn.Linear(dim_embedding, 4, device=device_acc)
         # Linear layer to determine whether to keep iterating or not based on the decoder output
         self.keep_iterating = nn.Linear(dim_embedding, 1, device=device_acc)
 
@@ -124,7 +122,7 @@ class SeedTransformer(nn.Module):
         encoded = self.transformer.encoder(
             src=embedded_src, mask=mask, src_key_padding_mask=padding_mask
         )
-        return encoded, self.nb_seeds_from_encoded(encoded[:, -1])
+        return encoded, self.nb_seeds_from_encoded(encoded[:, :, 0])
 
     def decode(
         self,
@@ -160,7 +158,6 @@ class SeedTransformer(nn.Module):
             memory_key_padding_mask=None,
         )
         return (
-            self.seed_vertex(reconstructed_seeds),
             self.seed_momentum(reconstructed_seeds),
             self.keep_sigmoide(self.keep_iterating(reconstructed_seeds)),
         )
@@ -196,12 +193,11 @@ class SeedTransformer(nn.Module):
         nb_loop = 0
         keep_iteration = True
         nb_seeds = Tensor(seed.size(0)).to(seed.device)
-        seed_vertex = Tensor(seed.size(0), seed.size(1), 3).to(seed.device)
-        seed_momentum = Tensor(seed.size(0), seed.size(1), 3).to(seed.device)
+        seed_momentum = Tensor(seed.size(0), seed.size(1), 4).to(seed.device)
 
         while nb_loop < mask_hits.size(0) and keep_iteration:
             # Decode the target sequence
-            seed_vertex, seed_momentum, keep = self.decode(
+            seed_momentum, keep = self.decode(
                 seed, encoded, mask_seed, padding_mask_seed
             )
             # Check if all the value of keep at rank nb_loop (for all the batch entry)  are below the threshold
@@ -211,9 +207,8 @@ class SeedTransformer(nn.Module):
         for batch in range(seed.size(0)):
             for hits in range(seed.size(1)):
                 if keep[batch, hits] < iter_threshold:
-                    seed_vertex[batch, hits, :] = 0
                     seed_momentum[batch, hits, :] = 0
                     nb_seeds[batch] = hits
                     break
 
-        return nb_seeds_encoder, nb_seeds, seed_vertex, seed_momentum
+        return nb_seeds_encoder, nb_seeds, seed_momentum
