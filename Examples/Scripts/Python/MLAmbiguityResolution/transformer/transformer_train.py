@@ -234,24 +234,26 @@ def prepare_input_tensor(
     # Ininitalise the padding masks
     padding_mask_hit = torch.zeros(nb_events, cfg.max_hit_input)
     padding_mask_particle = torch.zeros(nb_events, cfg.max_particle_input)
-    particle_class = torch.zeros(nb_events, cfg.max_hit_input, cfg.max_particle_input)
+    particle_class = torch.zeros(nb_events, cfg.max_hit_input, dtype=torch.long)
     for i in range(nb_events):
         # Select the hits and particles for the event i
         hits_event = hits[hits["event_id"] == i]
         particles_event = particles[particles["event_id"] == i]
 
-        # Fill same_particle which contain for each event a list of hits and for eah hits has a tensor of value 1 if the hit is the same as the particle
-        # and 0 otherwise
-        # The tensor is of size (max_hit_input, max_particle_input)
+        # particle_class is a tensor of size (nb_events, nb_hits) for each hit it associate a particle id between 0 and max_particle_input
 
-        particle_class[
-            i,
-            : hits_event.shape[0],
-            : min(len(particles_event["particle_id"].unique()), cfg.max_particle_input),
-        ] = torch.tensor(
-            (hits_event["particle_id"].values.reshape(-1, 1))
-            == (particles_event["particle_id"].values[: cfg.max_particle_input])
+        # Map the particle id to a class between 0 and max_particle_input
+        map_id = {}
+        for j, particle_id in enumerate(particles_event["particle_id"].unique()):
+            if j < cfg.max_particle_input:
+                map_id[particle_id] = j + 1
+            else:
+                map_id[particle_id] = 0
+
+        particle_class[i, : len(hits_event)] = torch.tensor(
+            hits_event["particle_id"].map(lambda x: map_id.get(x, 0)).values
         )
+
         particles_event = particles_event[["vz", "eta", "phi", "pT"]]
         # Add one column to the particles DataFrame to indicate if a particle is the last one in the events
         particles_event["iter"] = 1
@@ -468,7 +470,11 @@ def compute_loss(
 
     encoded, seed_class = model.encode(hits, mask_hits, padding_mask_hits)
     # Compute the loss for nb_seed by comparing its value to the number of particles in the events of the batch
-    loss_class = F.cross_entropy(seed_class, particle_class)
+
+    loss_class = 0
+    # Loop over the batch to compute the loss for the seed class
+    for i in range(seed_class.size(0)):
+        loss_class += F.cross_entropy(seed_class[i], particle_class[i])
 
     if encoder_only == True:
         loss_momentum, loss_iter = (
@@ -649,7 +655,7 @@ def test_model(
         print("The number of seed found is ", nb_seeds[0])
         # Compare the seed class and the particle class, for each hit print the bin nb of particle_class different from 0 and the bin nb of the largest bin of seed_class
         for hit in range(seed_class.size(1)):
-            particle_bin = torch.argmax(particle_class[0, hit])
+            particle_bin = particle_class[0, hit]
             seed_bin = torch.argmax(seed_class[0, hit])
             print("Hit", hit)
             print("Particle class bin:", particle_bin.item())
