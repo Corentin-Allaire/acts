@@ -472,9 +472,38 @@ def compute_loss(
     # Compute the loss for nb_seed by comparing its value to the number of particles in the events of the batch
 
     loss_class = 0
-    # Loop over the batch to compute the loss for the seed class
-    for i in range(seed_class.size(0)):
-        loss_class += F.cross_entropy(seed_class[i], particle_class[i])
+    # # Loop over the batch to compute the loss for the seed class
+    # for i in range(seed_class.size(0)):
+    #     loss_class += F.cross_entropy(seed_class[i], particle_class[i])
+
+    # Using the CosineEmbeddingLoss to compute the loss for the encoding of the hits (encoded)
+    # This will be used to ensure that the encoding of hit belonging to the same particle are close to each other
+    # and the encoding of hit belonging to different particle are far from each other
+    # The target is set to 1 for hit belonging to the same particle and -1 for hit belonging to different particle
+    for i in range(particle_class.size(0)):
+        for j in range(particle_class.size(1)):
+            target = torch.zeros(particle_class.size(1) - j - 1, device=device)
+            for k in range(j + 1, particle_class.size(1)):
+                if particle_class[i, j] == particle_class[i, k]:
+                    target[k - j - 1] = 1
+                else:
+                    target[k - j - 1] = -1
+            # stop if target contain only 1 (the padding as been reached)
+            if torch.sum(target) == target.size(0):
+                break
+            # print("The target is", target)
+            # print("The target size is", target.size())
+            # print("The encoded (1) is", encoded[i, j].unsqueeze(0).expand_as(encoded[i, j + 1:]))
+            # print("The encoded size is", encoded[i, j].unsqueeze(0).expand_as(encoded[i, j + 1:]).size())
+            # print("The encoded (2) is", encoded[i, j + 1:])
+            # print("The encoded size is", encoded[i, j + 1:].size())
+            lo = F.cosine_embedding_loss(
+                encoded[i, j].unsqueeze(0).expand_as(encoded[i, j + 1 :]),
+                encoded[i, j + 1 :],
+                target,
+            )
+            loss_class += lo
+            # print("The loss is", lo)
 
     if encoder_only == True:
         loss_momentum, loss_iter = (
@@ -579,7 +608,7 @@ def run_model(
         print("The loss iter: ", loss_iter.item())
 
         # Add the loss to t
-        loss = 100 * loss_class + 0.1 * loss_momentum + 10 * loss_iter
+        loss = 1 * loss_class + 0.1 * loss_momentum + 10 * loss_iter
         met.add_loss(
             epoch,
             loss.item(),
@@ -881,12 +910,6 @@ def main():
     # Delete all the variable to free some memory
     del model
     del opt
-    del hits_train
-    del particles_train
-
-    # Perform the validation of the model
-    model = torch.load("transformer.pt")
-    model.to(cfg.device_acc)
 
     # Display plot of the loss of the training and validation as a function of the epoch
     plot_loss(metrics_train.loss, metrics_val.loss, "Loss", cfg.interactive)
@@ -903,11 +926,9 @@ def main():
         metrics_train.loss_iter, metrics_val.loss_iter, "Loss_iter", cfg.interactive
     )
 
-    # Delete all the variable to free some memory
-    del hits_val
-    del particles_val
-    del metrics_train
-    del metrics_val
+    # Perform the validation of the model
+    model = torch.load("transformer.pt")
+    model.to(cfg.device_acc)
 
     if cfg.event_test > 0:
         # Perform the testing of the model
