@@ -19,7 +19,6 @@ class SeedTransformer(nn.Module):
         - embedding_encoder: Embedding layer for the encoder
         - embedding_decoder: Embedding layer for the decoder
         - pos_encoding_decoder: Positional encoding layer for the decoder
-        - classify_seed: Linear layer to classify the seed by particle
         - seed_vertex: Linear layer to extract the vertex position from the decoder output
         - seed_momentum: Linear layer to extract the seed momentum from the decoder output
         - keep_iterating: Linear layer to determine whether to keep iterating or not based on the decoder output
@@ -73,19 +72,12 @@ class SeedTransformer(nn.Module):
             device=device_acc,
         )
 
-        # Linear layer to extract the expected number of seed from the encoded information
-        self.classify_seed = nn.Linear(
-            dim_embedding,
-            dim_seed,
-            device=device_acc,
-        )
         # Linear layer to extract the seed Z0 and momentum from the decoder output
         self.seed_momentum = nn.Linear(dim_embedding, 4, device=device_acc)
         # Linear layer to determine whether to keep iterating or not based on the decoder output
         self.keep_iterating = nn.Linear(dim_embedding, 1, device=device_acc)
 
         self.keep_sigmoide = nn.Sigmoid().to(device_acc)
-        self.class_softMax = nn.Softmax(dim=2).to(device_acc)
         # # First token as a learnable parameter    <= THING ABOUT THIS AT A LATER POINT !!!
         # self.first_token = nn.Parameter(torch.randn(1, 6))
 
@@ -115,7 +107,6 @@ class SeedTransformer(nn.Module):
 
         Returns:
             - encoded (Tensor): Encoded memory.
-            - classify_seed (Tensor):  Attempt to classify the seed by particle
         """
         # Loop over the entry in the batch and run the embedding layer
         embedded_src = self.embedding_encoder(hits)
@@ -123,7 +114,7 @@ class SeedTransformer(nn.Module):
         encoded = self.transformer.encoder(
             src=embedded_src, mask=mask, src_key_padding_mask=padding_mask
         )
-        return encoded, self.class_softMax(self.classify_seed(encoded))
+        return encoded
 
     def decode(
         self,

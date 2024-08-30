@@ -468,42 +468,30 @@ def compute_loss(
     padding_mask_particle = padding_mask_particle.to(device)
     particle_class = particle_class.to(device)
 
-    encoded, seed_class = model.encode(hits, mask_hits, padding_mask_hits)
+    encoded = model.encode(hits, mask_hits, padding_mask_hits)
     # Compute the loss for nb_seed by comparing its value to the number of particles in the events of the batch
 
     loss_class = 0
-    # # Loop over the batch to compute the loss for the seed class
-    # for i in range(seed_class.size(0)):
-    #     loss_class += F.cross_entropy(seed_class[i], particle_class[i])
-
     # Using the CosineEmbeddingLoss to compute the loss for the encoding of the hits (encoded)
     # This will be used to ensure that the encoding of hit belonging to the same particle are close to each other
     # and the encoding of hit belonging to different particle are far from each other
     # The target is set to 1 for hit belonging to the same particle and -1 for hit belonging to different particle
+
     for i in range(particle_class.size(0)):
-        for j in range(particle_class.size(1)):
-            target = torch.zeros(particle_class.size(1) - j - 1, device=device)
-            for k in range(j + 1, particle_class.size(1)):
-                if particle_class[i, j] == particle_class[i, k]:
-                    target[k - j - 1] = 1
-                else:
-                    target[k - j - 1] = -1
-            # stop if target contain only 1 (the padding as been reached)
-            if torch.sum(target) == target.size(0):
-                break
-            # print("The target is", target)
-            # print("The target size is", target.size())
-            # print("The encoded (1) is", encoded[i, j].unsqueeze(0).expand_as(encoded[i, j + 1:]))
-            # print("The encoded size is", encoded[i, j].unsqueeze(0).expand_as(encoded[i, j + 1:]).size())
-            # print("The encoded (2) is", encoded[i, j + 1:])
-            # print("The encoded size is", encoded[i, j + 1:].size())
+        # count the number of 1 in padding_mask_hits
+        non_pad = torch.sum(1 - padding_mask_hits[i])
+        for j in range(non_pad):
+            # Créer un masque pour les éléments égaux
+            mask = (particle_class[i, j] == particle_class[i, j + 1 :]).float()
+            target = mask * 2 - 1  # Convertir True/False en 1/-1
+
+            # Calculer la perte en une seule opération vectorisée
             lo = F.cosine_embedding_loss(
                 encoded[i, j].unsqueeze(0).expand_as(encoded[i, j + 1 :]),
                 encoded[i, j + 1 :],
                 target,
             )
             loss_class += lo
-            # print("The loss is", lo)
 
     if encoder_only == True:
         loss_momentum, loss_iter = (
