@@ -551,10 +551,11 @@ def run_model(
     nb_batches = input_tensor_hits.size(0) // cfg.batch_size
     # Loop over the event batches
     for i in range(nb_batches):
-        if optimiser is not None:
-            print("Training batch:", i, "/", nb_batches)
-        else:
-            print("Validation batch:", i, "/", nb_batches)
+        if i % 100 == 0:
+            if optimiser is not None:
+                print("Training batch:", i, "/", nb_batches)
+            else:
+                print("Validation batch:", i, "/", nb_batches)
 
         # Select the batch of hits and particles
         batch_tensor_hits = input_tensor_hits[
@@ -591,9 +592,10 @@ def run_model(
             cfg.device_acc,
             cfg.encoder_only,
         )
-        print("The loss class: ", loss_class.item())
-        print("The loss momentum: ", loss_momentum.item())
-        print("The loss iter: ", loss_iter.item())
+        if i % 100 == 0:
+            print("The loss class: ", loss_class.item())
+            print("The loss momentum: ", loss_momentum.item())
+            print("The loss iter: ", loss_iter.item())
 
         # Add the loss to t
         loss = 1 * loss_class + 0.1 * loss_momentum + 10 * loss_iter
@@ -853,6 +855,23 @@ def main():
     else:
         print("The input type is not recognised")
         exit()
+
+    # For all tensor shuffle by event
+    # Shuffle the training tensor
+    perm = torch.randperm(input_tensor_hits_train.size(0))
+    input_tensor_hits_train = input_tensor_hits_train[perm]
+    input_tensor_particles_train = input_tensor_particles_train[perm]
+    particle_class_train = particle_class_train[perm]
+    padding_mask_hit_train = padding_mask_hit_train[perm]
+    padding_mask_particle_train = padding_mask_particle_train[perm]
+
+    # Shuffle the validation tensor
+    perm = torch.randperm(input_tensor_hits_val.size(0))
+    input_tensor_hits_val = input_tensor_hits_val[perm]
+    input_tensor_particles_val = input_tensor_particles_val[perm]
+    particle_class_val = particle_class_val[perm]
+    padding_mask_hit_val = padding_mask_hit_val[perm]
+    padding_mask_particle_val = padding_mask_particle_val[perm]
 
     # Initialise the metrics
     metrics_train = metrics(cfg.epoch_nb)
