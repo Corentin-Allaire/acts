@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "Acts/Utilities/AxisFwd.hpp"
+#include "Acts/Utilities/AxisDefinitions.hpp"
 #include "Acts/Utilities/IAxis.hpp"
 
 #include <algorithm>
@@ -97,7 +97,7 @@ class NeighborHoodIndices {
 /// This class provides some basic functionality for calculating bin indices
 /// for a given equidistant binning.
 template <AxisBoundaryType bdt>
-class Axis<AxisType::Equidistant, bdt> final : public IAxis {
+class Axis<AxisType::Equidistant, bdt> : public IAxis {
  public:
   static constexpr AxisType type = AxisType::Equidistant;
 
@@ -417,7 +417,7 @@ class Axis<AxisType::Equidistant, bdt> final : public IAxis {
 /// This class provides some basic functionality for calculating bin indices
 /// for a given binning with variable bin sizes.
 template <AxisBoundaryType bdt>
-class Axis<AxisType::Variable, bdt> final : public IAxis {
+class Axis<AxisType::Variable, bdt> : public IAxis {
  public:
   static constexpr AxisType type = AxisType::Variable;
 

@@ -21,7 +21,6 @@
 #include "Acts/Utilities/UnitVectors.hpp"
 
 #include <iterator>
-#include <type_traits>
 
 namespace Acts {
 
@@ -577,9 +576,6 @@ class TrackProxy {
       // append track states (cheap), but they're in the wrong order
       for (const auto& srcTrackState : other.trackStatesReversed()) {
         auto destTrackState = appendTrackState(srcTrackState.getMask());
-        if (srcTrackState.hasCalibrated()) {
-          destTrackState.allocateCalibrated(srcTrackState.calibratedSize());
-        }
         destTrackState.copyFrom(srcTrackState, Acts::TrackStatePropMask::All,
                                 true);
       }

@@ -9,7 +9,7 @@
 #pragma once
 
 #include "Acts/Definitions/Algebra.hpp"
-#include "Acts/Utilities/BinningType.hpp"
+#include "Acts/Utilities/AxisDefinitions.hpp"
 #include "Acts/Utilities/Delegate.hpp"
 #include "Acts/Utilities/VectorHelpers.hpp"
 
@@ -110,7 +110,7 @@ class IBoundToGridLocal {
 };
 
 template <typename global_to_grid_local_t>
-class Affine3Transformed final : public IGlobalToGridLocal {
+class Affine3Transformed : public IGlobalToGridLocal {
  public:
   using grid_local_t = typename global_to_grid_local_t::grid_local_t;
 
@@ -141,8 +141,8 @@ class Affine3Transformed final : public IGlobalToGridLocal {
 /// @brief A global (potentially casted) sub space of a global
 /// position
 /// @tparam ...Args
-template <BinningValue... Args>
-class GlobalSubspace final : public IGlobalToGridLocal {
+template <AxisDirection... Args>
+class GlobalSubspace : public IGlobalToGridLocal {
  public:
   using grid_local_t = std::array<double, sizeof...(Args)>;
 
@@ -157,8 +157,8 @@ class GlobalSubspace final : public IGlobalToGridLocal {
   // Constructor
   GlobalSubspace() = default;
 
-  /// The binning values
-  static constexpr std::array<BinningValue, sizeof...(Args)> bValues = {
+  /// The axis directions of the subspace
+  static constexpr std::array<AxisDirection, sizeof...(Args)> axisDirs = {
       Args...};
 
   /// Transform in to the local frame, then the grid local position
@@ -170,7 +170,7 @@ class GlobalSubspace final : public IGlobalToGridLocal {
     // Fill the grid point from global
     grid_local_t glocal{};
     GridAccessHelpers::fillCasts(
-        position, bValues, glocal,
+        position, axisDirs, glocal,
         std::make_integer_sequence<std::size_t, sizeof...(Args)>{});
     return glocal;
   }
@@ -179,7 +179,7 @@ class GlobalSubspace final : public IGlobalToGridLocal {
 // The bound to grid local transformation, if only access of a subspace
 // is requested
 template <std::size_t... Args>
-class LocalSubspace final : public IBoundToGridLocal {
+class LocalSubspace : public IBoundToGridLocal {
  public:
   using grid_local_t = std::array<double, sizeof...(Args)>;
 
@@ -212,7 +212,7 @@ class LocalSubspace final : public IBoundToGridLocal {
   }
 };
 
-class BoundCylinderToZPhi final : public IBoundToGridLocal {
+class BoundCylinderToZPhi : public IBoundToGridLocal {
  public:
   double radius = 1.;
   double shift = 0.;

@@ -10,6 +10,7 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include "Acts/Definitions/TrackParametrization.hpp"
 #include "Acts/Definitions/Units.hpp"
 #include "Acts/EventData/MultiTrajectory.hpp"
 #include "Acts/EventData/ProxyAccessor.hpp"
@@ -56,9 +57,13 @@ struct TestOutlierFinder {
     if (!state.hasCalibrated() || !state.hasPredicted()) {
       return false;
     }
-    auto residuals = (state.effectiveCalibrated() -
-                      state.effectiveProjector() * state.predicted())
-                         .eval();
+    auto subspaceHelper = state.projectorSubspaceHelper();
+    auto projector =
+        subspaceHelper.fullProjector()
+            .topLeftCorner(state.calibratedSize(), Acts::eBoundSize)
+            .eval();
+    auto residuals =
+        (state.effectiveCalibrated() - projector * state.predicted()).eval();
     auto distance = residuals.norm();
     return (distanceMax <= distance);
   }
@@ -231,7 +236,7 @@ struct FitterTester {
     // backward filtering requires a reference surface
     options.referenceSurface = &start.referenceSurface();
     // this is the default option. set anyway for consistency
-    options.propagatorPlainOptions.direction = Acts::Direction::Forward;
+    options.propagatorPlainOptions.direction = Acts::Direction::Forward();
 
     Acts::TrackContainer tracks{Acts::VectorTrackContainer{},
                                 Acts::VectorMultiTrajectory{}};
@@ -290,7 +295,7 @@ struct FitterTester {
         Acts::ParticleHypothesis::pion());
 
     options.referenceSurface = &startOuter.referenceSurface();
-    options.propagatorPlainOptions.direction = Acts::Direction::Backward;
+    options.propagatorPlainOptions.direction = Acts::Direction::Backward();
 
     Acts::TrackContainer tracks{Acts::VectorTrackContainer{},
                                 Acts::VectorMultiTrajectory{}};
