@@ -29,7 +29,7 @@ def prepareDataSet(data: pd.DataFrame) -> pd.DataFrame:
         ],
         keep="first",
     )
-    # data = data.sort_values("particleId")
+    data = data.sort_values("particleId")
     # Set truth particle ID as index
     data = data.set_index("particleId")
     # Transform the hit list from a string to an actual list
@@ -44,7 +44,7 @@ def prepareDataSet(data: pd.DataFrame) -> pd.DataFrame:
 class DuplicateClassifier(nn.Module):
     """MLP model used to separate good tracks from duplicate tracks. Return one score per track the higher one correspond to the good track."""
 
-    def __init__(self, input_dim, n_layers):
+    def __init__(self, input_dim, n_layers, margin):
         """Three layer MLP, 20% dropout, sigmoid activation for the last layer."""
         super(DuplicateClassifier, self).__init__()
         self.linear1 = nn.Linear(input_dim, n_layers[0])
@@ -52,6 +52,7 @@ class DuplicateClassifier(nn.Module):
         self.linear3 = nn.Linear(n_layers[1], n_layers[2])
         self.output = nn.Linear(n_layers[2], 1)
         self.sigmoid = nn.Sigmoid()
+        self.register_buffer("marginDuplicate", torch.tensor(marginDuplicate, dtype=torch.float32))
 
     def forward(self, z):
         z = F.relu(self.linear1(z))
