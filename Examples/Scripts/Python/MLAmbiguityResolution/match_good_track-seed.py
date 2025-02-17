@@ -22,7 +22,10 @@ def matchGood(seed_files: list[str], ckf_files: list[str]):
         data_seed = pd.read_csv(f_seed)
         # Add a good seed column to the seed dataset
         data_seed["goodSeed"] = data_seed["seed_id"].isin(goodSeed)
-
+        # Add a rank column 
+        data_seed["rank"] = -1
+        # if the seed match a track copy the track rank
+        data_seed.loc[data_seed["seed_id"].isin(data_track["seed_id"]), "rank"] = data_track["rank"]
         data_seed.loc[
             data_seed["good/duplicate/fake"] == "good", "good/duplicate/fake"
         ] = "duplicate"

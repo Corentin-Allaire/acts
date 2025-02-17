@@ -114,6 +114,8 @@ def scoringBatch(full_data, batch, duplicateClassifier, Optimiser=0):
     good_mask = data[2] == 0
     duplicate_mask = data[2] > 0
     fake_mask = data[2] < 0
+
+    good_weight = (good_mask.int() * 9 + 1) 
     # Compute tensors that will be used to compute the loss as a single matrix multiplication
     rank = torch.clone(data[2])
     good = torch.zeros_like(data[2])
@@ -149,7 +151,7 @@ def scoringBatch(full_data, batch, duplicateClassifier, Optimiser=0):
         # and binary cross entropy to separate the fake from the rest
         batch_loss = torch.tensor(0.0, requires_grad=False, device=device)
         batch_loss += F.relu(predictions - good_score + truths_rank * duplicateClassifier[1].marginDuplicate).sum()
-        batch_loss += torch.nn.functional.binary_cross_entropy(predictions, truth_good)
+        batch_loss += (torch.nn.functional.binary_cross_entropy(predictions, truth_good, reduction="none") * good_weight[id_cut:id_next]).sum()/10
 
         # Normalize loss and accumulate
         batch_loss = batch_loss / len(predictions)
@@ -251,7 +253,7 @@ def train_epoch(
     return ((nb_good_match / nb_part)*10 + (nb_best_match / nb_part))
 
 def train(
-    duplicateClassifier: DuplicateClassifier,
+    duplicateClassifier: nn.Sequential,
     input: tuple[torch.tensor, torch.tensor, torch.tensor],
     opt: torch.optim.Optimizer,
     epochs: int = 100,
@@ -323,6 +325,7 @@ def train(
         dynamic_axes={"x": {0: "batch_size"}, "y": {0: "batch_size"}},
     )
     del batch
+    return duplicateClassifier
 
 def test_model(
     duplicateClassifier: DuplicateClassifier, input: tuple[torch.tensor, torch.tensor, torch.tensor]
@@ -586,7 +589,7 @@ if __name__ == "__main__":
             ),
         )
 
-        study.optimize(objective, n_trials=5)
+        study.optimize(objective, n_trials=500)
 
         result_optuna(study)
 
@@ -597,7 +600,7 @@ if __name__ == "__main__":
         for i_layer in range(args.optimise_layer):
             best_layer.append(best_params["layer_" + str(i_layer)])
         best_model = nn.Sequential(
-            Normalise(avg_mean, avg_sdv),
+            Normalise(avg_mean_t, avg_sdv_t),
             DuplicateClassifier(
                 np.shape(x_train_t)[1],
                 best_layer,

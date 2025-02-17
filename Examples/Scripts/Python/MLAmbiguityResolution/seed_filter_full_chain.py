@@ -72,10 +72,8 @@ def cleanData(data, threshold, DBSCAN_eps: float = 0.1, DBSCAN_min_samples: int 
         sc = "random_score"
     cleanedData = []
     for event in data:
-        idx = event[sc] > threshold
-        cleanedEvent = event[idx].copy()
-        if not len(cleanedEvent) == 0:
-            cleanedEvent = clusterSeed(cleanedEvent, DBSCAN_eps, DBSCAN_min_samples, weight)
+        if not len(event) == 0:
+            cleanedEvent = clusterSeed(event, DBSCAN_eps, DBSCAN_min_samples, weight)
 
             # For each cluster only keep the seed with the highest score
             idmax = (
@@ -89,6 +87,9 @@ def cleanData(data, threshold, DBSCAN_eps: float = 0.1, DBSCAN_min_samples: int 
                 == cleanedEvent["seed_id"]
             )
             cleanedEvent = cleanedEvent[idfirst]
+
+        idx = cleanedEvent[sc] > threshold
+        cleanedEvent = cleanedEvent[idx]
         cleanedData.append(cleanedEvent)
     return cleanedData
 
@@ -161,20 +162,83 @@ def evalPerf(data, cleanedData, time, silent = False):
 
         print("tot: ", (time[3] - time[0]) * 1000 / len(CKF_files), "ms")
         print("Seed filter: ", (time[3] - time[1]) * 1000 / len(CKF_files), "ms")
-    return (100 * nb_reco_part / nb_part) + (10 * nb_good_match / nb_part) - ((nb_track- nb_part)/nb_track)
+    return (100 * nb_reco_part / nb_part) + (10 * nb_good_match / nb_part) - 20*((nb_track- nb_part)/nb_track)
 
 def perfPloting(data, cleanedData):
 
     import matplotlib.pyplot as plt
 
     # Make a copy of the data to be plotted
-    plotData = []
     plotDF = pd.DataFrame()
-    for event in data:
-        plotData.append(event.copy())
-        plotDF = pd.concat([plotDF, event.copy()])
+    plotDF_duplicate = pd.DataFrame()
+    plotDF_cluster = pd.DataFrame()
+    plotDF_good_cluster = pd.DataFrame()
+    plotDF_good_missing = pd.DataFrame()  # Initialize before loop
 
-    # Plot the distribution of the 4 variable
+    for event, cleanEvent in zip(data, cleanedData):
+        # Extract the duplicate seed and look at their maximum distance per particle in eta, phi, vertexZ and pT.
+        # This will be use the to tune the DBScan reweighting (the width of the 4 distribution after rewighting should be similar)
+        duplicate = event.loc[event["good/duplicate/fake"] == "duplicate"].copy()
+        weight = [0.1, 1, 10, 20]
+        duplicate.loc[:, "diff_eta"] = (duplicate.groupby(["particleId"])["eta"].transform("max") - duplicate.groupby(["particleId"])["eta"].transform("min")) / weight[0]
+        duplicate.loc[:, "diff_phi"] = (duplicate.groupby(["particleId"])["phi"].transform("max") - duplicate.groupby(["particleId"])["phi"].transform("min")) / weight[1]
+        duplicate.loc[:, "diff_vertexZ"] = (duplicate.groupby(["particleId"])["vertexZ"].transform("max") - duplicate.groupby(["particleId"])["vertexZ"].transform("min")) / weight[2]
+        duplicate.loc[:, "diff_pT"] = (duplicate.groupby(["particleId"])["pT"].transform("max") - duplicate.groupby(["particleId"])["pT"].transform("min")) / weight[3]
+        plotDF = pd.concat([plotDF, event.copy()])
+        plotDF_duplicate = pd.concat([plotDF_duplicate, duplicate])
+
+        # Compute number of seed per cluter and per type of seed
+        seed_info = event.copy()
+        seed_info["particleId"] = seed_info.index
+        seed_info["nb_seed"] = 0
+        seed_info["nb_fake"] = 0
+        seed_info["nb_duplicate"] = 0
+        seed_info["nb_good"] = 0
+        seed_info["nb_truth"] = 0
+        seed_info["nb_seed_truth"] = 0
+        seed_info["nb_seed_removed"] = 0
+
+        seed_info["nb_seed"] = seed_info.groupby(["cluster"])["cluster"].transform("size")
+        # Create histogram filled with the number of fake seeds per cluster
+        seed_info["nb_fake"] = seed_info.groupby("cluster")["good/duplicate/fake"].transform(
+            lambda x: (x == "fake").sum()
+        )
+        # Create histogram filled with the number of duplicate seeds per cluster
+        seed_info["nb_duplicate"] = seed_info.groupby("cluster")["good/duplicate/fake"].transform(
+            lambda x: (x == "duplicate").sum()
+        )
+        # Create histogram filled with the number of good seeds per cluster
+        seed_info["nb_good"] = seed_info.groupby("cluster")["good/duplicate/fake"].transform(
+            lambda x: (x == "good").sum()
+        )
+        # Create histogram filled with the number unique particle per cluster
+        seed_info["nb_truth"] = seed_info.groupby(["cluster"])["particleId"].transform('nunique')
+
+        # Filter the cluster associated with good particles
+        good_clusters = seed_info[event["good/duplicate/fake"] == "good"]["cluster"].unique()
+        filtered_good = seed_info[event["cluster"].isin(good_clusters)]
+
+        plotDF_cluster = pd.concat([plotDF_cluster, seed_info])
+        plotDF_good_cluster = pd.concat([plotDF_good_cluster, filtered_good])
+
+
+        fake_only_particleIds = cleanEvent.groupby("particleId").filter(
+            lambda x: x["good/duplicate/fake"].nunique() == 1 and x["good/duplicate/fake"].iloc[0] == "fake"
+        ).index.unique()
+        
+        # Add particles that are in event but not in cleanEvent
+        missing_particleIds = event.loc[~event.index.isin(cleanEvent.index)].index.unique()
+        fake_only_particleIds = np.concatenate((fake_only_particleIds, missing_particleIds))
+
+
+        good_missing = event.loc[event["good/duplicate/fake"] == "good"]
+        good_missing = good_missing[good_missing.index.isin(fake_only_particleIds)]
+
+        plotDF_good_missing = pd.concat([plotDF_good_missing, good_missing])
+
+
+
+    # Plot the distribution of the 4 variable positional seed variable
     plotDF["eta"].hist(bins=100)
     plt.xlabel("eta")
     plt.ylabel("nb seed")
@@ -205,83 +269,134 @@ def perfPloting(data, cleanedData):
     plt.savefig("pT_eta.png")
     plt.clf()
 
+    # Plot the maximum distance between duplicated seed in the 4 DBScan variables
+    plotDF_duplicate["diff_eta"].hist(bins=100, range=[0, 1])
+    plt.xlabel("diff_eta")
+    plt.ylabel("nb particle")
+    plt.savefig("diff_eta.png")
+    plt.clf()
 
-    plotDF2 = pd.DataFrame()
-    # Create histogram filled with the number of seeds per cluster
-    for event in cleanedData:
-        event["nb_seed"] = 0
-        event["nb_fake"] = 0
-        event["nb_duplicate"] = 0
-        event["nb_good"] = 0
-        event["nb_cluster"] = 0
-        event["nb_truth"] = 0
-        event["nb_seed_truth"] = 0
-        event["nb_seed_removed"] = 0
-        event["particleId"] = event.index
-        event["nb_seed"] = event.groupby(["cluster"])["cluster"].transform("size")
-        # Create histogram filled with the number of fake seeds per cluster
-        event.loc[event["good/duplicate/fake"] == "fake", "nb_fake"] = (
-            event.loc[event["good/duplicate/fake"] == "fake"]
-            .groupby(["cluster"])["cluster"]
-            .transform("size")
-        )
-        # Create histogram filled with the number of duplicate seeds per cluster
-        event.loc[event["good/duplicate/fake"] == "duplicate", "nb_duplicate"] = (
-            event.loc[event["good/duplicate/fake"] == "duplicate"]
-            .groupby(["cluster"])["cluster"]
-            .transform("size")
-        )
-        # Create histogram filled with the number of good seeds per cluster
-        event.loc[event["good/duplicate/fake"] == "good", "nb_good"] = (
-            event.loc[event["good/duplicate/fake"] == "good"]
-            .groupby(["cluster"])["cluster"]
-            .transform("size")
-        )
+    plotDF_duplicate["diff_phi"].hist(bins=100, range=[0, 1])
+    plt.xlabel("diff_phi")
+    plt.ylabel("nb particle")
+    plt.savefig("diff_phi.png")
+    plt.clf()
 
-        plotDF2 = pd.concat([plotDF2, event])
+    plotDF_duplicate["diff_vertexZ"].hist(bins=100, range=[0, 1])
+    plt.xlabel("diff_vertexZ")
+    plt.ylabel("nb particle")
+    plt.savefig("diff_vertexZ.png")
+    plt.clf()
 
-    plotDF2["nb_seed"].hist(bins=20, weights=1 / plotDF2["nb_seed"], range=[0, 20])
+    plotDF_duplicate["diff_pT"].hist(bins=100, range=[0, 1])
+    plt.xlabel("diff_pT")
+    plt.ylabel("nb particle")
+    plt.savefig("diff_pT.png")
+    plt.clf()
+
+    # Plot number of seed per cluster
+    plotDF_cluster["nb_seed"].hist(bins=21, weights=1 / plotDF_cluster["nb_seed"], range=[-0.5, 20.5])
     plt.xlabel("nb seed/[cluster]")
     plt.ylabel("Arbitrary unit")
     plt.savefig("nb_seed.png")
     plt.clf()
 
-    plotDF2["nb_fake"].hist(bins=10, weights=1 / plotDF2["nb_seed"], range=[0, 10])
+    plotDF_cluster["nb_fake"].hist(bins=21, weights=1 / plotDF_cluster["nb_seed"], range=[-0.5, 20.5])
     plt.xlabel("nb fake/[cluster]")
     plt.ylabel("Arbitrary unit")
     plt.savefig("nb_fake.png")
     plt.clf()
 
-    plotDF2["nb_duplicate"].hist(bins=10, weights=1 / plotDF2["nb_seed"], range=[0, 10])
+    plotDF_cluster["nb_duplicate"].hist(bins=21, weights=1 / plotDF_cluster["nb_seed"], range=[-0.5, 20.5])
     plt.xlabel("nb duplicate/[cluster]")
     plt.ylabel("Arbitrary unit")
     plt.savefig("nb_duplicate.png")
     plt.clf()
 
-    plotDF2["nb_good"].hist(bins=5, weights=1 / plotDF2["nb_seed"], range=[0, 5])
+    plotDF_cluster["nb_good"].hist(bins=5, weights=1 / plotDF_cluster["nb_seed"], range=[-0.5, 4.5])
     plt.xlabel("nb good/[cluster]")
     plt.ylabel("Arbitrary unit")
     plt.savefig("nb_good.png")
     plt.clf()
 
-    # ==================================================================
-    # Plotting
+    plotDF_cluster["nb_truth"].hist(bins=5, weights=1 / plotDF_cluster["nb_seed"], range=[-0.5, 4.5])
+    plt.xlabel("nb truth particle/[cluster]")
+    plt.ylabel("Arbitrary unit")
+    plt.savefig("nb_particle.png")
+    plt.clf()
 
-    # Combine the events to have a better statistic
-    DataPlots = pd.concat(data)
 
-    import matplotlib.pyplot as plt
+    # Plot number of seed per good cluster (at leas 1 good seed)
+    plotDF_good_cluster["nb_seed"].hist(bins=20, weights=1 / plotDF_good_cluster["nb_seed"], range=[0, 20])
+    plt.xlabel("nb seed/[cluster]")
+    plt.ylabel("Arbitrary unit")
+    plt.savefig("nb_seed.png")
+    plt.clf()
 
-    # Plot the average score distribution for each type of track
+    plotDF_good_cluster["nb_good"].hist(bins=5, weights=1 / plotDF_good_cluster["nb_seed"], range=[-0.5, 4.5])
+    plt.xlabel("nb good/[cluster]")
+    plt.ylabel("Arbitrary unit")
+    plt.savefig("good_cluster_nb_good_.png")
+    plt.clf()
+
+    plotDF_good_cluster["nb_fake"].hist(bins=10, weights=1 / plotDF_good_cluster["nb_seed"], range=[-0.5, 9.5])
+    plt.xlabel("nb fake/[cluster]")
+    plt.ylabel("Arbitrary unit")
+    plt.savefig("good_cluster_nb_fake.png")
+    plt.clf()
+
+    plotDF_good_cluster["nb_duplicate"].hist(bins=10, weights=1 / plotDF_good_cluster["nb_seed"], range=[-0.5, 9.5])
+    plt.xlabel("nb duplicate/[cluster]")
+    plt.ylabel("Arbitrary unit")
+    plt.savefig("good_cluster_nb_duplicate.png")
+    plt.clf()
+
+    plotDF_good_cluster["nb_truth"].hist(bins=5, weights=1 / plotDF_good_cluster["nb_seed"], range=[-0.5, 4.5])
+    plt.xlabel("nb truth particle/[cluster]")
+    plt.ylabel("Arbitrary unit")
+    plt.savefig("good_cluster_nb_particle.png")
+    plt.clf()
+
+
+    # Plot the distribution for truth particle that are removed by the filter
+    plotDF_good_missing["score"].hist(bins=100, range=[0, 1])
+    plt.xlabel("score")
+    plt.ylabel("number of particle")
+    plt.title("Score distribution for removed particles")
+    plt.savefig("innefficiency_score.png")
+    plt.clf()
+
+    plotDF_good_missing["eta"].hist(bins=100, range=[-3, 3])
+    plt.xlabel("eta")
+    plt.ylabel("number of particle")
+    plt.title("eta distribution for removed particles")
+    plt.savefig("innefficiency_eta.png")
+    plt.clf()
+
+    plotDF_good_missing["phi"].hist(bins=100, range=[-3, 3])
+    plt.xlabel("phi")
+    plt.ylabel("number of particle")
+    plt.title("phi distribution for removed particles")
+    plt.savefig("innefficiency_phi.png")
+    plt.clf()
+
+    plotDF_good_missing["pT"].hist(bins=40, range=[-0.5, 39.5])
+    plt.xlabel("score")
+    plt.ylabel("number of particle")
+    plt.title("pT distribution for removed particles")
+    plt.savefig("innefficiency_pT.png")
+    plt.clf()
+
+    # Plot the score and variable distribution for the 3 different type of seed
     plt.figure()
     for tag in ["good", "duplicate", "fake"]:
         weights = np.ones_like(
-            DataPlots.loc[DataPlots["good/duplicate/fake"] == tag]["score"]
+            plotDF.loc[plotDF["good/duplicate/fake"] == tag]["score"]
         ) / len(
-            DataPlots.loc[DataPlots["good/duplicate/fake"] == tag]["score"]
+            plotDF.loc[plotDF["good/duplicate/fake"] == tag]["score"]
         )
         plt.hist(
-            DataPlots.loc[DataPlots["good/duplicate/fake"] == tag]["score"],
+            plotDF.loc[plotDF["good/duplicate/fake"] == tag]["score"],
             bins=100,
             weights=weights,
             alpha=0.65,
@@ -296,13 +411,14 @@ def perfPloting(data, cleanedData):
     plt.savefig("score_distribution_log.png")
 
     # Average value of the score
-    averageDataPlots = DataPlots.loc[
-        DataPlots["good/duplicate/fake"] == "good"
+    averageDataPlots = plotDF.loc[
+        plotDF["good/duplicate/fake"] == "good"
     ].groupby(
         pd.cut(
-            DataPlots.loc[DataPlots["good/duplicate/fake"] == "good"]["eta"],
+            plotDF.loc[plotDF["good/duplicate/fake"] == "good"]["eta"],
             np.linspace(-3, 3, 100),
-        )
+        ),
+        observed=False,
     )
     plt.figure()
     plt.plot(
@@ -320,13 +436,13 @@ def perfPloting(data, cleanedData):
     plt.figure()
     plt.hist(
         [
-            DataPlots.loc[DataPlots["good/duplicate/fake"] == "good"][
+            plotDF.loc[plotDF["good/duplicate/fake"] == "good"][
                 "pT"
             ],
-            DataPlots.loc[
-                DataPlots["good/duplicate/fake"] == "duplicate"
+            plotDF.loc[
+                plotDF["good/duplicate/fake"] == "duplicate"
             ]["pT"],
-            DataPlots.loc[DataPlots["good/duplicate/fake"] == "fake"][
+            plotDF.loc[plotDF["good/duplicate/fake"] == "fake"][
                 "pT"
             ],
         ],
@@ -340,19 +456,19 @@ def perfPloting(data, cleanedData):
     plt.ylabel("number of tracks")
     plt.yscale("log")
     plt.title("pT distribution for each type of track")
-    plt.savefig("pT_distribution.png")
+    plt.savefig("distribution_pT.png")
 
     # Plot the eta distribution for each type of track
     plt.figure()
     plt.hist(
         [
-            DataPlots.loc[DataPlots["good/duplicate/fake"] == "good"][
+            plotDF.loc[plotDF["good/duplicate/fake"] == "good"][
                 "eta"
             ],
-            DataPlots.loc[
-                DataPlots["good/duplicate/fake"] == "duplicate"
+            plotDF.loc[
+                plotDF["good/duplicate/fake"] == "duplicate"
             ]["eta"],
-            DataPlots.loc[DataPlots["good/duplicate/fake"] == "fake"][
+            plotDF.loc[plotDF["good/duplicate/fake"] == "fake"][
                 "eta"
             ],
         ],
@@ -366,16 +482,17 @@ def perfPloting(data, cleanedData):
     plt.ylabel("number of tracks")
     plt.yscale("log")
     plt.title("eta distribution for each type of track")
-    plt.savefig("eta_distribution.png")
+    plt.savefig("distribution_eta.png")
 
     # Average value of the score for 50 pt bins
-    averageDataPlots = DataPlots.loc[
-        DataPlots["good/duplicate/fake"] == "good"
+    averageDataPlots = plotDF.loc[
+        plotDF["good/duplicate/fake"] == "good"
     ].groupby(
         pd.cut(
-            DataPlots.loc[DataPlots["good/duplicate/fake"] == "good"]["pT"],
+            plotDF.loc[plotDF["good/duplicate/fake"] == "good"]["pT"],
             np.linspace(0, 100, 50),
-        )
+        ), 
+        observed=False,
     )
     plt.figure()
     plt.plot(
@@ -388,6 +505,7 @@ def perfPloting(data, cleanedData):
     plt.ylabel("score")
     plt.title("Average score for each eta bin")
     plt.savefig("score_pt.png")
+    plt.clf()
 
 def result_optuna(study):
     """Print the result of the optuna hyperparameter tuning and save the plots"""
@@ -444,7 +562,7 @@ if __name__ == "__main__":
     timing.append(time.time())
     parser = argparse.ArgumentParser()
     parser.add_argument("--input",help="Input files for the test",default="/workdir/allairec/ruche_track_seed/event20[0-9][0-9]-seed_cleaned.csv")
-    parser.add_argument("--model",help="Input files for the test",default="/gpfs/workdir/allairec/SolverNetwork/train_seed_2layer/trained_seed_solver_best.pt")
+    parser.add_argument("--model",help="Input files for the test",default="/gpfs/workdir/allairec/SolverNetwork/train_seed_optimise_lay3/seed_solver_optimisation_best.pt")
     parser.add_argument("--optimise", help="Turn on optuna hyperparameter tuning", action='store_true', default=False)
     args = parser.parse_args()
     
@@ -452,7 +570,7 @@ if __name__ == "__main__":
     CKF_files = sorted(glob.glob(args.input))
     data = readDataSet(CKF_files)
 
-    duplicateClassifier = torch.load(args.model, map_location=torch.device('cpu'))
+    duplicateClassifier = torch.load(args.model, map_location=torch.device('cpu'), weights_only=False)
 
     # Data of each event after clustering
     # Data of each event after ambiguity resolution
@@ -485,17 +603,13 @@ if __name__ == "__main__":
         # Create an objective function that will be optimised later on
         def objective(trial):
             data_copy = data.copy()
-            threshold = trial.suggest_float("threshold", 0.0, 1)
-            DBSCAN_eps = trial.suggest_float("DBSCAN_eps", 0.001, 5)
+            threshold = trial.suggest_float("threshold", 0.05, 1)
+            DBSCAN_eps = trial.suggest_float("DBSCAN_eps", 0.01, 3)
             DBSCAN_min_samples = trial.suggest_int("DBSCAN_min_samples", 1, 10)
-            weight_eta = trial.suggest_float("weight_eta", 1, 5)
-            weight_phi = trial.suggest_float("weight_phi", 1, 5)
-            weight_vertexZ = trial.suggest_float("weight_vertexZ", 1, 100)
-            weight_pT = trial.suggest_float("weight_pT", 1, 100)
-            weight = [weight_eta, weight_phi, weight_vertexZ, weight_pT]
+            weight = [0.1, 1, 10, 20]
             timing = [0,1,2,3]
             cleanedData = cleanData(data_copy, threshold, DBSCAN_eps, DBSCAN_min_samples, weight)
-            score = evalPerf(data_copy, cleanedData, timing, False)
+            score = evalPerf(data_copy, cleanedData, timing, True)
             del data_copy, cleanedData
             return score
 
@@ -513,7 +627,7 @@ if __name__ == "__main__":
         best_trial = study.best_trial
         best_params = best_trial.params
         timing.append(time.time())
-        cleanedData = cleanData(data, best_params["threshold"], best_params["DBSCAN_eps"],  best_params["DBSCAN_min_samples"],  [best_params["weight_eta"], best_params["weight_phi"], best_params["weight_vertexZ"], best_params["weight_pT"]])
+        cleanedData = cleanData(data, best_params["threshold"], best_params["DBSCAN_eps"],  best_params["DBSCAN_min_samples"], [0.1, 1, 10, 20])
         timing.append(time.time())
         evalPerf(data, cleanedData, timing)
         perfPloting(data, cleanedData)
@@ -521,7 +635,7 @@ if __name__ == "__main__":
     else:
 
         timing.append(time.time())
-        cleanedData = cleanData(data, 0.2, 0.2, 2, [1, 1, 50, 1])
+        cleanedData = cleanData(data, 0.3, 0.1, 2, [0.1, 1, 10, 20])
         timing.append(time.time())
         evalPerf(data, cleanedData, timing)
         perfPloting(data, cleanedData)
