@@ -174,6 +174,7 @@ ProcessCode CsvTrackWriter::writeT(const AlgorithmContext& context,
       << "pT,eta,phi,"
       << "truthMatchProbability,"
       << "good/duplicate/fake,"
+      << "rank";
       << "Hits_ID";
 
   mos << '\n';
@@ -183,8 +184,14 @@ ProcessCode CsvTrackWriter::writeT(const AlgorithmContext& context,
   for (auto& [id, trajState] : infoMap) {
     if (listGoodTracks.contains(id)) {
       trajState.trackType = "good";
+      trajState.rank = 0;
     } else if (trajState.trackType != "fake") {
       trajState.trackType = "duplicate";
+      // compute the rank based on the position in the matched vector
+      auto it = std::ranges::find_if(
+          matched[trajState.particleId],
+          [&id](const auto& pair) { return pair.first.trackId == id; });
+      trajState.rank = std::distance(matched[trajState.particleId].begin(), it);
     }
 
     const auto& params = *trajState.fittedParameters;
@@ -208,6 +215,7 @@ ProcessCode CsvTrackWriter::writeT(const AlgorithmContext& context,
     mos << Acts::VectorHelpers::phi(momentum) << ",";
     mos << trajState.truthMatchProb << ",";
     mos << trajState.trackType << ",";
+    mos << trajState.rank << ",";
     mos << "\"[";
     for (auto& ID : trajState.measurementsID) {
       mos << ID << ",";
